@@ -137,7 +137,7 @@ select, input, button { font-family: 'Rajdhani', sans-serif; }
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect } = React;
+const { useState, useEffect, useMemo } = React;
 
 // ─── BRAND COLOURS ───────────────────────────────────────────────────────────
 const C = {
@@ -255,7 +255,22 @@ const ActionPill = ({ action }) => {
 };
 
 // ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
-const Overview = ({ filtered }) => {
+// ─── DISCREPANCY ENGINE ───────────────────────────────────────────────────────
+function normName(s) { return (s || '').toLowerCase().trim().replace(/\s+/g, ' '); }
+
+function computeDiscrepancies(notionData, platformData) {
+  if (!platformData || !notionData) return { themes: [], subthemes: [], indicators: [] };
+  const backendThemes     = new Set(platformData.themes.map(t => normName(t.name)));
+  const backendSubthemes  = new Set(platformData.themes.flatMap(t => (t.subthemes || []).map(s => normName(s.name))));
+  const backendIndicators = new Set(platformData.themes.flatMap(t => (t.subthemes || []).flatMap(s => (s.indicators || []).map(i => normName(i.name)))));
+  return {
+    themes:     notionData.filter(r => r.db === 'Themes'     && !backendThemes.has(normName(r.name))),
+    subthemes:  notionData.filter(r => r.db === 'Sub-themes' && !backendSubthemes.has(normName(r.name))),
+    indicators: notionData.filter(r => r.db === 'Indicators' && !backendIndicators.has(normName(r.name))),
+  };
+}
+
+const Overview = ({ filtered, discrepancies, allData }) => {
   const total = filtered.length;
   const needs = filtered.filter(r => r.requiresAction && r.requiresAction !== "No Action Required").length;
   const belindaQ = filtered.filter(r => r.actionNeededBy === "Belinda").length;
@@ -333,6 +348,34 @@ const Overview = ({ filtered }) => {
           </div>))}
       </Card>
     </div>
+    {discrepancies && allData && (() => {
+      const totals = { Themes: allData.filter(r => r.db === 'Themes').length, 'Sub-themes': allData.filter(r => r.db === 'Sub-themes').length, Indicators: allData.filter(r => r.db === 'Indicators').length };
+      const missing = { Themes: discrepancies.themes.length, 'Sub-themes': discrepancies.subthemes.length, Indicators: discrepancies.indicators.length };
+      const totalMissing = missing.Themes + missing['Sub-themes'] + missing.Indicators;
+      return (
+        <div style={{ marginTop: 16 }}>
+          <Card title={<>Platform Sync <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 3, background: totalMissing > 0 ? C.coral + "22" : C.olive + "22", color: totalMissing > 0 ? C.coral : C.olive, marginLeft: 8 }}>{totalMissing > 0 ? `${totalMissing} missing` : "All synced"}</span></>} sub="Notion → Backend transfer status">
+            {['Themes', 'Sub-themes', 'Indicators'].map(db => {
+              const total = totals[db] || 0;
+              const synced = total - (missing[db] || 0);
+              const pct = total > 0 ? Math.round(synced / total * 100) : 100;
+              const color = pct === 100 ? C.olive : pct >= 75 ? C.amber : C.coral;
+              return (
+                <div key={db} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                    <span>{db}</span>
+                    <span style={{ color: C.dim }}>{synced} / {total} <span style={{ color, fontWeight: 700 }}>({pct}%)</span></span>
+                  </div>
+                  <div style={{ height: 6, background: C.cloud, borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 0.4s" }} />
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+        </div>
+      );
+    })()}
   </div>;
 };
 
@@ -617,6 +660,258 @@ const Velocity = ({ data }) => {
   </div>;
 };
 
+// ─── PLATFORM MODELS TAB ──────────────────────────────────────────────────────
+const PlatformTheme = ({ theme }) => {
+  const [open, setOpen] = useState(false);
+  const [openSubs, setOpenSubs] = useState({});
+  const toggleSub = id => setOpenSubs(p => ({ ...p, [id]: !p[id] }));
+  const subCount = theme.subthemes?.length ?? 0;
+  const indicCount = theme.subthemes?.reduce((n, s) => n + (s.indicators?.length ?? 0), 0) ?? 0;
+
+  return <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, overflow: "hidden", color: C.white }}>
+    <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
+      <span style={{ fontSize: 9, transition: "transform 0.15s", transform: open ? "rotate(90deg)" : "none", color: "rgba(255,255,255,0.4)" }}>▶</span>
+      <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{theme.name}</span>
+      {theme.theoryOfChangeStage && <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 2, background: "rgba(240,199,29,0.2)", color: "#F0C71D" }}>{theme.theoryOfChangeStage}</span>}
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{subCount} sub-themes · {indicCount} indicators</span>
+      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: "rgba(133,135,85,0.25)", color: "#c8d89a" }}>{theme.status}</span>
+    </div>
+    {open && <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "10px 12px" }}>
+      <div style={{ borderLeft: "2px dashed rgba(255,255,255,0.1)", paddingLeft: 10, marginLeft: 6 }}>
+        {subCount === 0
+          ? <div style={{ padding: "8px 12px", fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>No sub-themes</div>
+          : theme.subthemes.map(sub => {
+            const iCount = sub.indicators?.length ?? 0;
+            return <div key={sub._id} style={{ borderRadius: 4, marginBottom: 5, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
+              <div onClick={() => toggleSub(sub._id)} style={{ padding: "9px 12px", display: "flex", alignItems: "center", gap: 8, cursor: iCount > 0 ? "pointer" : "default" }}>
+                {iCount > 0 && <span style={{ fontSize: 9, transition: "transform 0.15s", transform: openSubs[sub._id] ? "rotate(90deg)" : "none", color: "rgba(255,255,255,0.4)" }}>▶</span>}
+                <span style={{ fontSize: 12, fontWeight: 600, flex: 1, color: "rgba(255,255,255,0.85)" }}>{sub.name}</span>
+                {sub.theoryOfChangeStage && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 2, background: "rgba(240,199,29,0.15)", color: "#F0C71D" }}>{sub.theoryOfChangeStage === "Stage 1 - Output" ? "Stage 1" : "Stage 2"}</span>}
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{iCount} indicators</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: "rgba(133,135,85,0.2)", color: "#c8d89a" }}>{sub.status}</span>
+              </div>
+              {openSubs[sub._id] && iCount > 0 && <div style={{ padding: "4px 12px 10px 28px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                {sub.indicators.map(ind => <div key={ind._id} style={{ padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "flex-start", gap: 8 }}>
+                  <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", marginTop: 3, flexShrink: 0 }}>◆</span>
+                  <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>{ind.name}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: "rgba(133,135,85,0.2)", color: "#c8d89a", flexShrink: 0, marginLeft: "auto" }}>{ind.status}</span>
+                </div>)}
+              </div>}
+            </div>;
+          })}
+      </div>
+    </div>}
+  </div>;
+};
+
+const PlatformCatalogueRow = ({ item, cols }) => (
+  <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center" }}>
+    {item}
+  </div>
+);
+
+const Platform = ({ data }) => {
+  const [catalogueTab, setCatalogueTab] = useState("standards");
+
+  if (!data) return <div style={{ padding: "40px 0", textAlign: "center", color: C.muted, fontStyle: "italic" }}>
+    Platform data unavailable — check that BACKEND_API_URL and KNOWLEDGEBASE_API_KEY are set in Netlify environment variables.
+  </div>;
+
+  const { summary, themes = [], standards = [], sdgs = [], esgCategories = [], exportedAt } = data;
+
+  const catTabs = [
+    { key: "standards", label: "Standards", count: standards.length },
+    { key: "sdgs", label: "SDGs", count: sdgs.length },
+    { key: "esg", label: "ESG Categories", count: esgCategories.length },
+  ];
+
+  return <div>
+    {/* Summary row */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
+      {[
+        { val: summary?.themes ?? themes.length, label: "Themes", color: C.plum },
+        { val: summary?.subthemes ?? "—", label: "Sub-themes", color: C.amber },
+        { val: summary?.indicators ?? "—", label: "Indicators", color: C.olive },
+        { val: summary?.standards ?? standards.length, label: "Standards", color: C.forest },
+        { val: summary?.sdgs ?? sdgs.length, label: "SDGs", color: "#11302A" },
+        { val: summary?.esgCategories ?? esgCategories.length, label: "ESG Categories", color: C.muted },
+      ].map(({ val, label, color }) =>
+        <div key={label} style={{ background: C.white, borderRadius: 6, padding: "16px 18px", borderLeft: `4px solid ${color}` }}>
+          <div style={{ fontSize: 30, fontWeight: 700, color: C.forest, lineHeight: 1 }}>{val}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 4, fontWeight: 600 }}>{label}</div>
+        </div>
+      )}
+    </div>
+
+    {/* Theme tree */}
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase", marginBottom: 10 }}>Theme Taxonomy</div>
+      {themes.length === 0
+        ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic", background: C.white, borderRadius: 6 }}>No published themes found</div>
+        : themes.map(t => <PlatformTheme key={t._id} theme={t} />)}
+    </div>
+
+    {/* Catalogue tabs: Standards / SDGs / ESG */}
+    <div style={{ background: C.white, borderRadius: 6, overflow: "hidden" }}>
+      <div style={{ display: "flex", borderBottom: `1px solid ${C.cloud}`, padding: "0 16px" }}>
+        {catTabs.map(ct => <button key={ct.key} onClick={() => setCatalogueTab(ct.key)} style={{ padding: "10px 14px", border: "none", background: "transparent", fontFamily: "inherit", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", color: catalogueTab === ct.key ? C.plum : C.muted, borderBottom: catalogueTab === ct.key ? `2px solid ${C.plum}` : "2px solid transparent", marginBottom: -1 }}>
+          {ct.label} <span style={{ fontSize: 10, color: C.dim }}>({ct.count})</span>
+        </button>)}
+      </div>
+
+      {catalogueTab === "standards" && <div>
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <span>Code</span><span>Name</span><span>Issuing Body</span><span>Status</span>
+        </div>
+        {standards.length === 0
+          ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic" }}>No active standards</div>
+          : standards.map(s => <div key={s._id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 80px", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center", fontSize: 13 }}>
+            <span style={{ fontWeight: 700, color: C.plum }}>{s.code}</span>
+            <span style={{ fontWeight: 500 }}>{s.name}{s.description && <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 2 }}>{s.description}</span>}</span>
+            <span style={{ fontSize: 12, color: C.muted }}>{s.issuingBody}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: s.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: s.status === "active" ? C.olive : C.coral }}>{s.status}</span>
+          </div>)}
+      </div>}
+
+      {catalogueTab === "sdgs" && <div>
+        <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <span>Code</span><span>Goal</span><span>Status</span>
+        </div>
+        {sdgs.length === 0
+          ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic" }}>No active SDGs</div>
+          : sdgs.map(s => <div key={s._id} style={{ display: "grid", gridTemplateColumns: "70px 1fr 80px", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center", fontSize: 13 }}>
+            <span style={{ fontWeight: 700, color: C.amber }}>{s.code}</span>
+            <span style={{ fontWeight: 500 }}>{s.name}{s.description && <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 2 }}>{s.description}</span>}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: s.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: s.status === "active" ? C.olive : C.coral }}>{s.status}</span>
+          </div>)}
+      </div>}
+
+      {catalogueTab === "esg" && <div>
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 110px 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <span>Code</span><span>Name</span><span>Type</span><span>Status</span>
+        </div>
+        {esgCategories.length === 0
+          ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic" }}>No active ESG categories</div>
+          : esgCategories.map(e => {
+            const typeColor = { Environmental: C.olive, Social: C.amber, Governance: C.plum }[e.type] || C.muted;
+            return <div key={e._id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 110px 80px", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center", fontSize: 13 }}>
+              <span style={{ fontWeight: 700, color: C.forest }}>{e.code}</span>
+              <span style={{ fontWeight: 500 }}>{e.name}{e.description && <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 2 }}>{e.description}</span>}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: typeColor + "20", color: typeColor }}>{e.type}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: e.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: e.status === "active" ? C.olive : C.coral }}>{e.status}</span>
+            </div>;
+          })}
+      </div>}
+    </div>
+
+    {exportedAt && <div style={{ marginTop: 10, fontSize: 11, color: C.dim, textAlign: "right" }}>Last exported from platform: {new Date(exportedAt).toLocaleString()}</div>}
+  </div>;
+};
+
+// ─── DISCREPANCIES TAB ───────────────────────────────────────────────────────
+const Discrepancies = ({ discrepancies, allData, platformData }) => {
+  const [dbFilter, setDbFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
+  if (!platformData) return (
+    <div style={{ textAlign: "center", padding: 60, color: C.dim, fontStyle: "italic" }}>
+      Backend not connected — set BACKEND_API_URL and KNOWLEDGEBASE_API_KEY to enable discrepancy detection.
+    </div>
+  );
+
+  const { themes, subthemes, indicators } = discrepancies;
+  const totals = {
+    Themes: allData.filter(r => r.db === 'Themes').length,
+    'Sub-themes': allData.filter(r => r.db === 'Sub-themes').length,
+    Indicators: allData.filter(r => r.db === 'Indicators').length,
+  };
+
+  const allRows = [
+    ...themes.map(r => ({ ...r, _db: 'Themes' })),
+    ...subthemes.map(r => ({ ...r, _db: 'Sub-themes' })),
+    ...indicators.map(r => ({ ...r, _db: 'Indicators' })),
+  ];
+
+  const notionStatuses = [...new Set(allRows.map(r => r.status).filter(Boolean))].sort();
+
+  const rows = allRows
+    .filter(r => dbFilter === 'ALL' || r._db === dbFilter)
+    .filter(r => statusFilter === 'ALL' || r.status === statusFilter);
+
+  const totalMissing = themes.length + subthemes.length + indicators.length;
+  const filterBtn = (label, val, current, setter, count) => (
+    <button key={val} onClick={() => setter(val)} style={{ padding: "5px 12px", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "inherit", border: `1px solid ${current === val ? C.coral : C.cloud}`, background: current === val ? C.coral + "18" : "transparent", color: current === val ? C.coral : C.muted, cursor: "pointer" }}>
+      {label}{count !== undefined ? ` (${count})` : ''}
+    </button>
+  );
+
+  const dbColors = { Themes: C.amber, 'Sub-themes': C.plum, Indicators: C.olive };
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 16, marginBottom: 24 }}>
+        <KPI val={totalMissing} label="Total missing" accent={C.coral} />
+        <KPI val={themes.length} label="Themes" accent={C.amber} />
+        <KPI val={subthemes.length} label="Sub-themes" accent={C.plum} />
+        <KPI val={indicators.length} label="Indicators" accent={C.olive} />
+      </div>
+
+      {['Themes', 'Sub-themes', 'Indicators'].map(db => {
+        const total = totals[db] || 0;
+        const missing = discrepancies[db === 'Themes' ? 'themes' : db === 'Sub-themes' ? 'subthemes' : 'indicators'].length;
+        const synced = total - missing;
+        const pct = total > 0 ? Math.round(synced / total * 100) : 100;
+        const color = dbColors[db];
+        return (
+          <div key={db} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, marginBottom: 4, color: C.muted }}>
+              <span style={{ color }}>{db}</span>
+              <span>{synced} / {total} transferred &nbsp;<span style={{ color: pct === 100 ? C.olive : C.coral, fontWeight: 700 }}>{pct}%</span></span>
+            </div>
+            <div style={{ height: 5, background: C.cloud, borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
+            </div>
+          </div>
+        );
+      })}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 20, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: 4 }}>DB</span>
+        {filterBtn('All', 'ALL', dbFilter, setDbFilter)}
+        {filterBtn('Themes', 'Themes', dbFilter, setDbFilter, themes.length)}
+        {filterBtn('Sub-themes', 'Sub-themes', dbFilter, setDbFilter, subthemes.length)}
+        {filterBtn('Indicators', 'Indicators', dbFilter, setDbFilter, indicators.length)}
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginLeft: 12, marginRight: 4 }}>Status</span>
+        {filterBtn('All', 'ALL', statusFilter, setStatusFilter)}
+        {notionStatuses.map(s => filterBtn(s, s, statusFilter, setStatusFilter))}
+      </div>
+
+      {rows.length === 0
+        ? <div style={{ textAlign: "center", padding: 40, color: C.olive, fontStyle: "italic", fontWeight: 600 }}>✓ All {dbFilter === 'ALL' ? '' : dbFilter + ' '}items transferred to backend</div>
+        : <div style={{ background: C.white, borderRadius: 8, border: `1px solid ${C.cloud}`, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 110px 80px 80px", gap: 0, background: C.off, borderBottom: `1px solid ${C.cloud}`, padding: "8px 16px" }}>
+              {['Database', 'Name', 'Notion Status', 'Vertical', 'Link'].map(h => (
+                <span key={h} style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</span>
+              ))}
+            </div>
+            {rows.map((r, i) => (
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "120px 1fr 110px 80px 80px", gap: 0, padding: "10px 16px", borderBottom: i < rows.length - 1 ? `1px solid ${C.cloud}` : "none", alignItems: "center", background: i % 2 === 0 ? C.white : "#faf9f6" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: dbColors[r._db] || C.muted }}>{r._db}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: C.forest, paddingRight: 16 }}>{r.name || '—'}</span>
+                <span style={{ fontSize: 11, color: C.muted }}>{r.status || '—'}</span>
+                <span style={{ fontSize: 11, color: C.dim }}>{r.vertical || '—'}</span>
+                <a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.amber, textDecoration: "none", fontWeight: 600 }}>View ↗</a>
+              </div>
+            ))}
+          </div>
+      }
+      <div style={{ marginTop: 10, fontSize: 11, color: C.dim, textAlign: "right" }}>
+        Showing {rows.length} of {allRows.length} missing items · Questions excluded (no backend equivalent)
+      </div>
+    </div>
+  );
+};
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [tab, setTab] = useState("overview");
@@ -624,17 +919,48 @@ function App() {
   const [vFilter, setVFilter] = useState("ALL");
   const [oFilter, setOFilter] = useState("ALL");
   const [batchSize, setBatchSize] = useState(10);
-  const [syncMsg, setSyncMsg] = useState("Demo mode · deploy to Netlify for live sync");
+  const [syncMsg, setSyncMsg] = useState("Loading…");
+  const [allData, setAllData] = useState(SEED_DATA);
+  const [platformData, setPlatformData] = useState(null);
+  const [dbCounts, setDbCounts] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
 
-  const allData = SEED_DATA;
+  const fetchData = () => {
+    setSyncing(true);
+    fetch("/.netlify/functions/notion-data")
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        const items = Array.isArray(data) ? data : SEED_DATA;
+        setAllData(items);
+        const counts = items.reduce((acc, item) => { acc[item.db] = (acc[item.db] || 0) + 1; return acc; }, {});
+        setDbCounts(counts);
+        setSyncMsg(`Live · ${items.length} QA items · ${new Date().toLocaleTimeString()}`);
+      })
+      .catch(() => {
+        setAllData(SEED_DATA);
+        setDbCounts(null);
+        setSyncMsg("Demo mode · Notion function unavailable");
+      })
+      .finally(() => setSyncing(false));
+
+    fetch("/.netlify/functions/backend-data")
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => setPlatformData(data))
+      .catch(() => setPlatformData(null));
+  };
+
+  useEffect(() => { fetchData(); }, []);
+  const discrepancies = useMemo(() => computeDiscrepancies(allData, platformData), [allData, platformData]);
+
   const filtered = allData.filter(r =>
     (vFilter === "ALL" || r.vertical === vFilter) &&
     (oFilter === "ALL" || r.actionNeededBy === oFilter) &&
     (workMode === "ALL" || r.db === workMode)
   );
 
-  const TABS = ["overview", "today", "pipeline", "quality", "hierarchy", "search", "velocity"];
-  const TAB_LABELS = { overview: "Overview", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity" };
+  const TABS = ["overview", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "discrepancies"];
+  const TAB_LABELS = { overview: "Overview", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Models", discrepancies: "⚠ Sync Gaps" };
   const MODES = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
 
   const headerBtn = (label, onClick, active) => (
@@ -665,7 +991,29 @@ function App() {
               <input type="number" value={batchSize} onChange={e => setBatchSize(parseInt(e.target.value) || 10)} min={5} max={25} style={{ width: 50, padding: "6px 8px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: C.white, fontSize: 13, fontFamily: "inherit", textAlign: "center" }} />
             </div>
           </div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em" }}>{syncMsg}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ position: "relative" }} onMouseEnter={() => setShowTooltip(true)} onMouseLeave={() => setShowTooltip(false)}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em", cursor: dbCounts ? "help" : "default" }}>{syncMsg}</div>
+              {showTooltip && dbCounts && (
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#0d2620", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, padding: "10px 14px", minWidth: 190, zIndex: 100, boxShadow: "0 4px 20px rgba(0,0,0,0.5)", pointerEvents: "none" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.amber, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Items by database</div>
+                  {Object.entries(dbCounts).map(([db, count]) => (
+                    <div key={db} style={{ display: "flex", justifyContent: "space-between", gap: 20, fontSize: 12, color: "rgba(255,255,255,0.7)", padding: "3px 0" }}>
+                      <span>{db}</span>
+                      <span style={{ fontWeight: 700, color: C.white }}>{count.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                    <span>Total</span>
+                    <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>{Object.values(dbCounts).reduce((a, b) => a + b, 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={fetchData} disabled={syncing} style={{ padding: "3px 9px", borderRadius: 3, fontSize: 10, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: syncing ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.45)", cursor: syncing ? "not-allowed" : "pointer" }}>
+              {syncing ? "Syncing…" : "↻ Sync"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -697,13 +1045,15 @@ function App() {
 
       {/* CONTENT */}
       <div style={{ padding: "24px 32px", maxWidth: 1500, margin: "0 auto" }}>
-        {tab === "overview" && <Overview filtered={filtered} />}
+        {tab === "overview" && <Overview filtered={filtered} discrepancies={discrepancies} allData={allData} />}
         {tab === "today" && <Today filtered={filtered} batchSize={batchSize} />}
         {tab === "pipeline" && <Pipeline filtered={filtered} />}
         {tab === "quality" && <Quality filtered={filtered} />}
-        {tab === "hierarchy" && <Hierarchy vFilter={vFilter} data={SEED_DATA} />}
-        {tab === "search" && <Search data={SEED_DATA} />}
+        {tab === "hierarchy" && <Hierarchy vFilter={vFilter} data={allData} />}
+        {tab === "search" && <Search data={allData} />}
         {tab === "velocity" && <Velocity data={allData} />}
+        {tab === "platform" && <Platform data={platformData} />}
+        {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={allData} platformData={platformData} />}
       </div>
 
       {/* FOOTER */}
