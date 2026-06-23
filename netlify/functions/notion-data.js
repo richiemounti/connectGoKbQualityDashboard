@@ -49,14 +49,28 @@ function extractRating(prop) {
   return match ? parseInt(match[1], 10) : null;
 }
 
-// Rollup returns an array — grab first value
-function extractRollupFirst(prop) {
-  const arr = prop?.rollup?.array;
-  if (!arr || arr.length === 0) return null;
-  const first = arr[0];
-  if (first?.type === 'select') return first.select?.name ?? null;
-  if (first?.type === 'rich_text') return first.rich_text?.map(t => t.plain_text).join('') || null;
+// Formula field — returns string/number/boolean value
+function extractFormula(prop) {
+  const f = prop?.formula;
+  if (!f) return null;
+  if (f.type === 'string') return f.string || null;
+  if (f.type === 'number') return f.number !== null ? String(f.number) : null;
+  if (f.type === 'boolean') return String(f.boolean);
   return null;
+}
+
+// People field — returns comma-joined display names, or null
+function extractPeopleNames(prop) {
+  const people = prop?.people || [];
+  return people.length ? people.map(p => p.name).join(', ') : null;
+}
+
+// Normalize vertical values so all DBs use the same token set.
+// Sub-themes uses "BOTH: C4C AND REFLECT"; everything else uses "BOTH".
+function normalizeVertical(raw) {
+  if (!raw) return null;
+  if (raw.toUpperCase().includes('BOTH')) return 'BOTH';
+  return raw;
 }
 
 async function queryDatabase(databaseId, token) {
@@ -111,7 +125,9 @@ function mapPage(page, dbName) {
       id, db: 'Themes', url,
       name: extractTitle(props['Theme Name']),
       status: extractStatus(props['Theme Status']),
-      vertical: extractSelect(props['Vertical']),
+      vertical: normalizeVertical(extractSelect(props['Vertical'])),
+      approvedBy: null,
+      developedBy: null,
       ...commonQaFields(props),
       themeId: null,
       subthemeId: null,
@@ -124,7 +140,10 @@ function mapPage(page, dbName) {
       id, db: 'Sub-themes', url,
       name: extractTitle(props['Sub-theme name']),
       status: extractStatus(props['Subtheme Status']),
-      vertical: extractSelect(props['Vertical']),
+      // Sub-themes uses "BOTH: C4C AND REFLECT" — normalise to "BOTH"
+      vertical: normalizeVertical(extractSelect(props['Vertical'])),
+      approvedBy: extractPeopleNames(props['Approved By']),
+      developedBy: null,
       ...commonQaFields(props),
       themeId: extractRelationFirst(props['Theme database']),
       subthemeId: null,
@@ -137,7 +156,9 @@ function mapPage(page, dbName) {
       id, db: 'Indicators', url,
       name: extractTitle(props['Indicator statement']),
       status: extractStatus(props['Status']),
-      vertical: extractSelect(props['Vertical']),
+      vertical: normalizeVertical(extractSelect(props['Vertical'])),
+      approvedBy: null,
+      developedBy: extractPeopleNames(props['Developed By']),
       ...commonQaFields(props),
       themeId: null,
       subthemeId: extractRelationFirst(props['Subtheme']),
@@ -146,11 +167,15 @@ function mapPage(page, dbName) {
   }
 
   if (dbName === 'Questions') {
+    // Vertical is a formula field named "Vertical " (trailing space) derived from linked Subtheme
     return {
       id, db: 'Questions', url,
       name: extractTitle(props['Question Text']),
-      status: extractStatus(props['Question Status']),
-      vertical: extractRollupFirst(props['Vertical (via Subtheme)']),
+      // Question Status is a select (not a status widget) — use extractSelect
+      status: extractSelect(props['Question Status']),
+      vertical: normalizeVertical(extractFormula(props['Vertical '])),
+      approvedBy: null,
+      developedBy: null,
       ...commonQaFields(props),
       themeId: null,
       subthemeId: extractRelationFirst(props['Subtheme']),

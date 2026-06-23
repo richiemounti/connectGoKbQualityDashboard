@@ -203,20 +203,36 @@ const isOver = d => !!d && d < todayStr();
 const isWeek = d => { if (!d) return false; const t = todayStr(); const e = new Date(); e.setDate(e.getDate() + (7 - e.getDay())); const eStr = e.toISOString().split('T')[0]; return d >= t && d <= eStr; };
 const isDue = d => !!d && (isWeek(d) || isOver(d));
 
+// ─── PEOPLE ───────────────────────────────────────────────────────────────────
+const PEOPLE = {
+  Belinda: { color: C.olive,   initials: 'BE', role: 'Content developer' },
+  Kate:    { color: C.plum,    initials: 'KA', role: 'Sign-off & approvals' },
+  Both:    { color: C.amber,   initials: 'B+', role: 'Joint action' },
+  Hope:    { color: '#c47b3a', initials: 'HO', role: 'Reviewer' },
+  Hannah:  { color: '#4e7ca8', initials: 'HA', role: 'Reviewer' },
+};
+// Named individuals only (excludes "Both") — used to drive queue cards and batch columns
+const NAMED_OWNERS = ['Belinda', 'Kate', 'Hope', 'Hannah'];
+
 const PILL_STYLES = {
   "Belinda": { bg: "rgba(133,135,85,0.15)", color: "#505530" },
-  "Kate": { bg: "rgba(205,128,40,0.15)", color: "#7A4800" },
-  "Both": { bg: "rgba(240,199,29,0.15)", color: "#7A6000" },
-  "Revise and Resubmit": { bg: "rgba(238,92,95,0.12)", color: "#901818" },
-  "Complete Missing Fields": { bg: "rgba(240,199,29,0.12)", color: "#7A6000" },
-  "Awaiting Decision": { bg: "rgba(205,128,40,0.12)", color: "#7A4800" },
-  "Awaiting Sign-off": { bg: "rgba(81,20,51,0.1)", color: C.plum },
-  "Ready to Publish": { bg: "rgba(17,48,42,0.08)", color: C.forest },
-  "No Action Required": { bg: "rgba(133,135,85,0.08)", color: C.muted },
-  "Themes": { bg: "rgba(81,20,51,0.08)", color: C.plum },
-  "Sub-themes": { bg: "rgba(205,128,40,0.08)", color: C.amber },
-  "Indicators": { bg: "rgba(133,135,85,0.1)", color: C.olive },
-  "Questions": { bg: "rgba(17,48,42,0.08)", color: C.forest },
+  "Kate":    { bg: "rgba(81,20,51,0.15)",   color: "#511433" },
+  "Both":    { bg: "rgba(205,128,40,0.15)", color: "#7A4800" },
+  "Hope":    { bg: "rgba(196,123,58,0.15)", color: "#7a4000" },
+  "Hannah":  { bg: "rgba(78,124,168,0.15)", color: "#234e72" },
+  "Revise and Resubmit":       { bg: "rgba(238,92,95,0.12)",  color: "#901818" },
+  "Complete Missing Fields":   { bg: "rgba(240,199,29,0.12)", color: "#7A6000" },
+  "Awaiting Decision":         { bg: "rgba(205,128,40,0.12)", color: "#7A4800" },
+  "Awaiting Sign-off":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
+  "Ready to Publish":          { bg: "rgba(17,48,42,0.08)",   color: C.forest },
+  "No Action Required":        { bg: "rgba(133,135,85,0.08)", color: C.muted },
+  "Discuss with Kate":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
+  "Discuss with Hope":         { bg: "rgba(196,123,58,0.1)",  color: "#7a4000" },
+  "Discuss with Hannah":       { bg: "rgba(78,124,168,0.1)",  color: "#234e72" },
+  "Themes":     { bg: "rgba(81,20,51,0.08)",    color: C.plum },
+  "Sub-themes": { bg: "rgba(205,128,40,0.08)",  color: C.amber },
+  "Indicators": { bg: "rgba(133,135,85,0.1)",   color: C.olive },
+  "Questions":  { bg: "rgba(17,48,42,0.08)",    color: C.forest },
 };
 
 const Pill = ({ label, small }) => {
@@ -256,6 +272,53 @@ const ActionPill = ({ action }) => {
   return <Pill label={action} />;
 };
 
+// ─── PERSON QUEUE CARD ────────────────────────────────────────────────────────
+const PersonQueueCard = ({ person, filtered }) => {
+  const cfg = PEOPLE[person] || { color: C.muted, initials: person.slice(0, 2).toUpperCase(), role: '' };
+  const queue = filtered.filter(r => r.actionNeededBy === person && r.requiresAction && r.requiresAction !== 'No Action Required');
+  const overdue  = queue.filter(r => isOver(r.deadline)).length;
+  const dueWeek  = queue.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
+  const noDl     = queue.length - overdue - dueWeek;
+  const actionCounts = {};
+  queue.forEach(r => { actionCounts[r.requiresAction] = (actionCounts[r.requiresAction] || 0) + 1; });
+  const topAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  const maxBar = Math.max(overdue, dueWeek, noDl, 1);
+
+  const bar = (count, color, label) => count > 0 && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
+      <div style={{ flex: 1, height: 5, background: C.cloud, borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.round(count / maxBar * 100)}%`, background: color, borderRadius: 3 }} />
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, color, minWidth: 80, textAlign: 'right' }}>{count} {label}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ background: C.white, borderRadius: 8, padding: '18px 20px', borderTop: `4px solid ${cfg.color}`, display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+        <div style={{ width: 42, height: 42, borderRadius: '50%', background: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: C.white, letterSpacing: 1, flexShrink: 0 }}>{cfg.initials}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.forest }}>{person}</div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 1, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{cfg.role}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 36, fontWeight: 800, color: queue.length > 0 ? cfg.color : C.dim, lineHeight: 1 }}>{queue.length}</div>
+          <div style={{ fontSize: 9, color: C.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>in queue</div>
+        </div>
+      </div>
+      {queue.length === 0
+        ? <div style={{ fontSize: 12, color: C.olive, fontWeight: 600, paddingTop: 4 }}>Queue clear ✓</div>
+        : <div>
+            {bar(overdue,  C.coral,   'overdue')}
+            {bar(dueWeek,  '#c4a000', 'due this wk')}
+            {bar(noDl,     C.dim,     'no deadline')}
+            {topAction && <div style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Top task: <span style={{ fontWeight: 700, color: C.muted }}>{topAction}</span></div>}
+          </div>
+      }
+    </div>
+  );
+};
+
 // ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
 // ─── DISCREPANCY ENGINE ───────────────────────────────────────────────────────
 function normName(s) { return (s || '').toLowerCase().trim().replace(/\s+/g, ' '); }
@@ -278,46 +341,161 @@ function computeDiscrepancies(notionData, platformData) {
   };
 }
 
+// ─── ACTION BREAKDOWN (expandable) ───────────────────────────────────────────
+const ACTION_COLORS = {
+  'No Action Required':      C.olive,
+  'Complete Missing Fields': '#F0C71D',
+  'Revise and Resubmit':     C.coral,
+  'Awaiting Decision':       C.amber,
+  'Awaiting Sign-off':       C.plum,
+  'Ready to Publish':        C.forest,
+};
+const actionColor = k => {
+  if (ACTION_COLORS[k]) return ACTION_COLORS[k];
+  if (k && k.startsWith('Discuss with')) return (PEOPLE[k.replace('Discuss with ', '')] || {}).color || C.muted;
+  return C.muted;
+};
+
+const PAGE = 10;
+
+const ActionBreakdown = ({ filtered, total }) => {
+  const [expanded, setExpanded] = useState({});
+  const [shown, setShown] = useState({});
+
+  const aC = {};
+  filtered.forEach(r => { if (r.requiresAction) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+
+  const toggle = k => setExpanded(e => ({ ...e, [k]: !e[k] }));
+  const showMore = (e, k, items) => {
+    e.stopPropagation();
+    setShown(s => ({ ...s, [k]: Math.min((s[k] || PAGE) + PAGE, items.length) }));
+  };
+
+  return (
+    <Card title="Action Breakdown">
+      <div style={{ maxHeight: 520, overflowY: 'auto', overflowX: 'hidden' }}>
+      {Object.entries(aC).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
+        const color   = actionColor(k);
+        const isOpen  = !!expanded[k];
+        const items   = filtered.filter(r => r.requiresAction === k);
+        const limit   = shown[k] || PAGE;
+        const visible = items.slice(0, limit);
+        const hasMore = items.length > limit;
+        const pct     = total > 0 ? Math.round(v / total * 100) : 0;
+
+        return (
+          <div key={k} style={{ marginBottom: isOpen ? 14 : 8 }}>
+            {/* Clickable header row */}
+            <div onClick={() => toggle(k)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', marginBottom: 5 }}>
+              <span style={{ fontSize: 8, color, transition: 'transform 0.15s', display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none', flexShrink: 0 }}>▶</span>
+              <span style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>{k}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: color + '22', color }}>{v}</span>
+            </div>
+            {/* Progress bar */}
+            <div style={{ height: 4, background: C.cloud, borderRadius: 2, overflow: 'hidden', marginLeft: 16, marginBottom: isOpen ? 8 : 0 }}>
+              <div style={{ height: '100%', borderRadius: 2, background: color, width: `${pct}%` }} />
+            </div>
+            {/* Expanded item list */}
+            {isOpen && (
+              <div style={{ marginLeft: 16, background: C.off, borderRadius: 6, border: `1px solid ${C.cloud}`, maxHeight: 320, overflowY: 'auto', overflowX: 'hidden' }}>
+                {visible.map((r, i) => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 10px', borderBottom: i < visible.length - 1 ? `1px solid ${C.cloud}` : 'none', minWidth: 0 }}>
+                    <span style={{ fontSize: 10, color: C.dim, width: 18, fontWeight: 600, flexShrink: 0 }}>{i + 1}</span>
+                    <Pill label={r.db} small />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.forest, fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>{r.name}</span>
+                    {r.vertical && <span style={{ fontSize: 10, color: C.dim, flexShrink: 0 }}>{r.vertical}</span>}
+                    {r.deadline && <span style={{ fontSize: 10, color: isOver(r.deadline) ? C.coral : C.dim, fontWeight: isOver(r.deadline) ? 700 : 400, flexShrink: 0, whiteSpace: 'nowrap' }}>{isOver(r.deadline) ? '⚠ ' : ''}{r.deadline}</span>}
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.amber, textDecoration: 'none', fontWeight: 700, flexShrink: 0 }}>↗</a>
+                  </div>
+                ))}
+                {hasMore && (
+                  <div style={{ padding: '7px 10px', borderTop: `1px solid ${C.cloud}`, textAlign: 'center' }}>
+                    <button onClick={e => showMore(e, k, items)} style={{ fontSize: 11, fontWeight: 700, color: C.amber, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Show next {Math.min(PAGE, items.length - limit)} · {items.length - limit} remaining ↓
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      </div>
+    </Card>
+  );
+};
+
 const Overview = ({ filtered, discrepancies, allData }) => {
   const total = filtered.length;
   const needs = filtered.filter(r => r.requiresAction && r.requiresAction !== "No Action Required").length;
-  const belindaQ = filtered.filter(r => r.actionNeededBy === "Belinda").length;
-  const kateQ = filtered.filter(r => r.actionNeededBy === "Kate").length;
-  const over = filtered.filter(r => isOver(r.deadline)).length;
-  const wk = filtered.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
+  const over  = filtered.filter(r => isOver(r.deadline)).length;
+  const wk    = filtered.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
   const aC = {};
   filtered.forEach(r => { if (r.requiresAction) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+
   const dims = ["taxonomic", "completeness", "construct", "design"];
-  const dL = ["Taxonomic Thinking", "Completeness", "Construct Understanding", "Design"];
-  const pipeStages = [
-    ["Complete Missing Fields", "#F0C71D", "→ Belinda"],
-    ["Revise and Resubmit", C.coral, "→ Belinda"],
-    ["Awaiting Decision", C.amber, ""],
-    ["Awaiting Sign-off", C.plum, "→ Kate"],
-    ["Ready to Publish", C.forest, ""],
-    ["No Action Required", C.olive, ""],
+  const dL   = ["Taxonomic Thinking", "Completeness", "Construct Understanding", "Design"];
+
+  // Fixed pipeline stages
+  const FIXED_STAGES = [
+    { key: 'Complete Missing Fields', color: '#F0C71D', owner: 'Belinda' },
+    { key: 'Revise and Resubmit',     color: C.coral,   owner: 'Belinda' },
+    { key: 'Awaiting Decision',       color: C.amber,   owner: null },
+    { key: 'Awaiting Sign-off',       color: C.plum,    owner: 'Kate' },
+    { key: 'Ready to Publish',        color: C.forest,  owner: null },
+    { key: 'No Action Required',      color: C.olive,   owner: null },
   ];
+  // Dynamic discuss stages derived from live data
+  const discussStages = [...new Set(
+    filtered.map(r => r.requiresAction).filter(v => v && v.startsWith('Discuss with'))
+  )].sort().map(key => {
+    const who = key.replace('Discuss with ', '');
+    return { key, color: (PEOPLE[who] || {}).color || C.muted, owner: who, isDiscuss: true };
+  });
 
   return <div>
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 16, marginBottom: 16 }}>
-      <KPI val={total} label="In scope" accent={C.forest} />
+    {/* Top stats row */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 16 }}>
+      <KPI val={total} label="In scope"    accent={C.forest} />
       <KPI val={needs} label="Needs action" accent={C.amber} />
-      <KPI val={belindaQ} label="Belinda's queue" accent={C.olive} />
-      <KPI val={kateQ} label="Kate's queue" accent={C.plum} />
-      <KPI val={over} label="Overdue" accent={C.coral} />
-      <KPI val={wk} label="Due this week" accent="#F0C71D" />
+      <KPI val={over}  label="Overdue"     accent={C.coral} />
+      <KPI val={wk}    label="Due this week" accent="#F0C71D" />
     </div>
+
+    {/* Per-person queue cards */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12, marginBottom: 16 }}>
+      {NAMED_OWNERS.map(person => <PersonQueueCard key={person} person={person} filtered={filtered} />)}
+    </div>
+
+    {/* Pipeline + Quality */}
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
       <Card title="Action Pipeline">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(110px,1fr))", gap: 3 }}>
-          {pipeStages.map(([k, color, owner]) => (
-            <div key={k} style={{ padding: "14px 16px", borderRadius: 6, background: color + "18", border: `1px solid ${color}44` }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color }}>{aC[k] || 0}</div>
-              <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginTop: 4, lineHeight: 1.3 }}>{k}</div>
-              {owner && <div style={{ fontSize: 9, color: C.dim, marginTop: 2 }}>{owner}</div>}
+        {/* Fixed stages */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(105px,1fr))", gap: 3, marginBottom: discussStages.length > 0 ? 10 : 0 }}>
+          {FIXED_STAGES.map(({ key, color, owner }) => (
+            <div key={key} style={{ padding: "12px 14px", borderRadius: 6, background: color + "18", border: `1px solid ${color}44` }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color }}>{aC[key] || 0}</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginTop: 4, lineHeight: 1.3 }}>{key}</div>
+              {owner && <div style={{ fontSize: 9, color: C.dim, marginTop: 2 }}>→ {owner}</div>}
             </div>
           ))}
         </div>
+        {/* Discussion stages — shown only when present in data */}
+        {discussStages.length > 0 && (
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: C.dim, textTransform: 'uppercase', marginBottom: 6 }}>Discussions</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 3 }}>
+              {discussStages.map(({ key, color, owner }) => (
+                <div key={key} style={{ padding: "12px 14px", borderRadius: 6, background: color + "12", border: `1px dashed ${color}55`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 26, fontWeight: 800, color }}>{aC[key] || 0}</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginTop: 2 }}>Discuss with {owner}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </Card>
       <Card title="Avg Quality Scores" sub="Nulls excluded">
         {dims.map((d, i) => {
@@ -348,17 +526,7 @@ const Overview = ({ filtered, discrepancies, allData }) => {
             : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>No upcoming or overdue deadlines</div>;
         })()}
       </Card>
-      <Card title="Action Breakdown">
-        {Object.entries(aC).map(([k, v]) => (
-          <div key={k} style={{ marginBottom: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-              <span>{k}</span><span>{v}</span>
-            </div>
-            <div style={{ height: 4, background: C.cloud, borderRadius: 2, overflow: "hidden" }}>
-              <div style={{ height: "100%", borderRadius: 2, background: { "No Action Required": C.olive, "Complete Missing Fields": "#F0C71D", "Revise and Resubmit": C.coral, "Awaiting Decision": C.amber, "Awaiting Sign-off": C.plum, "Ready to Publish": C.forest }[k] || "#ccc", width: `${total > 0 ? Math.round(v / total * 100) : 0}%` }} />
-            </div>
-          </div>))}
-      </Card>
+      <ActionBreakdown filtered={filtered} total={total} />
     </div>
     {discrepancies && allData && (() => {
       const inScopeOv  = r => r.vertical === 'REFLECT' || r.vertical === 'BOTH';
@@ -396,76 +564,126 @@ const Overview = ({ filtered, discrepancies, allData }) => {
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
 const Today = ({ filtered, batchSize }) => {
   const [done, setDone] = useState({});
+
   const buildBatch = (owner) => filtered
     .filter(r => r.actionNeededBy === owner && r.requiresAction && r.requiresAction !== "No Action Required" && r.requiresAction !== "Ready to Publish" && !done[r.id])
-    .sort((a, b) => { if (isOver(a.deadline) !== isOver(b.deadline)) return isOver(a.deadline) ? -1 : 1; if (isWeek(a.deadline) !== isWeek(b.deadline)) return isWeek(a.deadline) ? -1 : 1; if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline); return a.deadline ? -1 : b.deadline ? 1 : 0; })
+    .sort((a, b) => {
+      if (isOver(a.deadline) !== isOver(b.deadline)) return isOver(a.deadline) ? -1 : 1;
+      if (isWeek(a.deadline) !== isWeek(b.deadline)) return isWeek(a.deadline) ? -1 : 1;
+      if (a.deadline && b.deadline) return a.deadline > b.deadline ? 1 : -1;
+      return a.deadline ? -1 : b.deadline ? 1 : 0;
+    })
     .slice(0, batchSize);
 
-  const BatchItem = ({ r, i, owner }) => (
-    <div style={{ background: C.off, borderRadius: 6, padding: "14px 16px", marginBottom: 8, borderLeft: `3px solid ${done[r.id] ? C.olive : C.cloud}`, display: "flex", alignItems: "flex-start", gap: 14, opacity: done[r.id] ? 0.5 : 1 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.dim, minWidth: 24, paddingTop: 2 }}>{i + 1}</div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: C.forest }}>{r.name}</div>
-        <div style={{ fontSize: 11, color: C.muted, marginTop: 3, display: "flex", gap: 6, alignItems: "center" }}>
-          <Pill label={r.db} small />
-          <Pill label={r.requiresAction} small />
-          {r.deadline && <span style={{ color: isOver(r.deadline) ? C.coral : C.dim }}>{r.deadline}</span>}
+  // Derive active owners — only show columns for people who have items
+  const activeOwners = NAMED_OWNERS.filter(o => buildBatch(o).length > 0 || filtered.some(r => r.actionNeededBy === o && r.requiresAction && r.requiresAction !== "No Action Required"));
+
+  const BatchItem = ({ r, i, owner }) => {
+    const cfg = PEOPLE[owner] || { color: C.muted };
+    return (
+      <div style={{ background: C.off, borderRadius: 6, padding: "14px 16px", marginBottom: 8, borderLeft: `3px solid ${done[r.id] ? C.olive : cfg.color}`, display: "flex", alignItems: "flex-start", gap: 14, opacity: done[r.id] ? 0.5 : 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.dim, minWidth: 24, paddingTop: 2 }}>{i + 1}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.forest, lineHeight: 1.4 }}>{r.name}</div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <Pill label={r.db} small />
+            <Pill label={r.requiresAction} small />
+            {r.vertical && <Pill label={r.vertical} small />}
+            {r.deadline && <span style={{ color: isOver(r.deadline) ? C.coral : C.dim, fontWeight: isOver(r.deadline) ? 700 : 400 }}>{isOver(r.deadline) ? '⚠ ' : ''}{r.deadline}</span>}
+          </div>
+          {r.developedBy && <div style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>Developed by: <span style={{ fontWeight: 600 }}>{r.developedBy}</span></div>}
+          {r.approvedBy  && <div style={{ fontSize: 10, color: C.dim, marginTop: 1 }}>Approved by: <span style={{ fontWeight: 600 }}>{r.approvedBy}</span></div>}
+          {r.notes && <div style={{ fontSize: 11, color: C.muted, marginTop: 4, fontStyle: "italic" }}>{r.notes.slice(0, 120)}{r.notes.length > 120 ? "…" : ""}</div>}
         </div>
-        {r.notes && <div style={{ fontSize: 11, color: C.muted, marginTop: 4, fontStyle: "italic" }}>{r.notes.slice(0, 120)}{r.notes.length > 120 ? "..." : ""}</div>}
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {done[r.id]
+            ? <span style={{ fontSize: 11, color: C.olive, fontWeight: 700 }}>✓ Done</span>
+            : owner === "Kate"
+              ? <>
+                  <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.olive, color: C.white, fontFamily: "inherit" }}>✓ Approve</button>
+                  <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.coral, color: C.white, fontFamily: "inherit" }}>↩ Revise</button>
+                </>
+              : <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.amber, color: C.white, fontFamily: "inherit" }}>↑ Pass to Kate</button>
+          }
+        </div>
       </div>
-      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-        {done[r.id]
-          ? <span style={{ fontSize: 11, color: C.olive, fontWeight: 700 }}>✓ Done {new Date().toLocaleTimeString()}</span>
-          : owner === "Kate"
-            ? <><button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.olive, color: C.white, fontFamily: "inherit" }}>✓ Approve</button>
-              <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.coral, color: C.white, fontFamily: "inherit" }}>↩ Revise</button></>
-            : <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.amber, color: C.white, fontFamily: "inherit" }}>↑ Return to Kate</button>}
-      </div>
+    );
+  };
+
+  if (activeOwners.length === 0) {
+    return <div style={{ textAlign: "center", padding: 60, color: C.dim, fontStyle: "italic" }}>No active queues — all items are clear or unassigned</div>;
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(activeOwners.length, 2)}, 1fr)`, gap: 16 }}>
+      {activeOwners.map(owner => {
+        const cfg = PEOPLE[owner] || { color: C.muted };
+        const batch = buildBatch(owner);
+        const qTotal = filtered.filter(r => r.actionNeededBy === owner && r.requiresAction && r.requiresAction !== "No Action Required").length;
+        return (
+          <Card key={owner} title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: C.white }}>{(PEOPLE[owner] || {}).initials || owner.slice(0,2)}</div>
+              <span>{owner}'s Batch</span>
+              <span style={{ fontSize: 10, fontWeight: 400, color: C.dim, marginLeft: 2 }}>{batch.length} of {qTotal} in queue</span>
+            </div>
+          }>
+            {batch.length
+              ? batch.map((r, i) => <BatchItem key={r.id} r={r} i={i} owner={owner} />)
+              : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>Queue clear 🎉</div>
+            }
+          </Card>
+        );
+      })}
     </div>
   );
-
-  const kb = buildBatch("Kate"), bb = buildBatch("Belinda");
-  const kTotal = filtered.filter(r => r.actionNeededBy === "Kate" && r.requiresAction && r.requiresAction !== "No Action Required").length;
-  const bTotal = filtered.filter(r => r.actionNeededBy === "Belinda" && r.requiresAction && r.requiresAction !== "No Action Required").length;
-
-  return <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-    <Card title="Kate's Batch Today">
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-        <span style={{ fontSize: 11, color: C.dim }}>{kb.length} of {kTotal} in queue</span>
-        <span style={{ fontSize: 28, fontWeight: 700, color: C.plum }}>{kb.length}</span>
-      </div>
-      {kb.length ? kb.map((r, i) => <BatchItem key={r.id} r={r} i={i} owner="Kate" />) : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>Queue clear 🎉</div>}
-    </Card>
-    <Card title="Belinda's Batch Today">
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-        <span style={{ fontSize: 11, color: C.dim }}>{bb.length} of {bTotal} in queue</span>
-        <span style={{ fontSize: 28, fontWeight: 700, color: C.olive }}>{bb.length}</span>
-      </div>
-      {bb.length ? bb.map((r, i) => <BatchItem key={r.id} r={r} i={i} owner="Belinda" />) : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>Queue clear 🎉</div>}
-    </Card>
-  </div>;
 };
 
 // ─── PIPELINE TAB ─────────────────────────────────────────────────────────────
 const Pipeline = ({ filtered }) => {
-  const stages = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Decision", "Awaiting Sign-off", "Ready to Publish", "No Action Required"];
-  return <div>{stages.map(s => {
+  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Decision", "Awaiting Sign-off", "Ready to Publish", "No Action Required"];
+  const discussStages = [...new Set(filtered.map(r => r.requiresAction).filter(v => v && v.startsWith('Discuss with')))].sort();
+  const allStages     = [...FIXED_STAGES, ...discussStages];
+
+  const tdStyle = { padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 12 };
+
+  return <div>{allStages.map(s => {
     const items = filtered.filter(r => r.requiresAction === s);
     if (!items.length) return null;
-    return <div key={s} style={{ background: C.white, borderRadius: 6, padding: "20px 22px", marginBottom: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase", marginBottom: 14 }}>
-        {s} <span style={{ color: C.amber, marginLeft: 8 }}>{items.length}</span>
+    const isDiscuss = s.startsWith('Discuss with');
+    const stageColor = isDiscuss ? (PEOPLE[s.replace('Discuss with ', '')] || {}).color || C.muted : C.amber;
+
+    // Decide which attribution columns to show for this stage's items
+    const showDeveloped = items.some(r => r.developedBy);
+    const showApproved  = items.some(r => r.approvedBy);
+
+    return <div key={s} style={{ background: C.white, borderRadius: 6, padding: "20px 22px", marginBottom: 16, borderLeft: isDiscuss ? `4px dashed ${stageColor}55` : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        {isDiscuss && <span style={{ fontSize: 14 }}>💬</span>}
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase" }}>{s}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: stageColor }}>{items.length}</span>
       </div>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead><tr>{["Item", "DB", "Owner", "Vertical", "Deadline"].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase" }}>{h}</th>)}</tr></thead>
-        <tbody>{items.map(r => <tr key={r.id}>
-          <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontWeight: 600 }}>{r.name}</td>
-          <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}><Pill label={r.db} small /></td>
-          <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}>{r.actionNeededBy && <Pill label={r.actionNeededBy} small />}</td>
-          <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11 }}>{r.vertical || "—"}</td>
-          <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, color: isOver(r.deadline) ? C.coral : "inherit", fontWeight: isOver(r.deadline) ? 700 : 400 }}>{r.deadline || "—"}</td>
-        </tr>)}</tbody>
-      </table>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr>
+            {["Item", "DB", "Owner", "Vertical", "Deadline",
+              ...(showDeveloped ? ["Developed By"] : []),
+              ...(showApproved  ? ["Approved By"]  : []),
+              "Link"
+            ].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap' }}>{h}</th>)}
+          </tr></thead>
+          <tbody>{items.map(r => <tr key={r.id}>
+            <td style={{ ...tdStyle, fontWeight: 600, maxWidth: 320 }}>{r.name}</td>
+            <td style={tdStyle}><Pill label={r.db} small /></td>
+            <td style={tdStyle}>{r.actionNeededBy ? <Pill label={r.actionNeededBy} small /> : '—'}</td>
+            <td style={{ ...tdStyle, fontSize: 11 }}>{r.vertical || "—"}</td>
+            <td style={{ ...tdStyle, color: isOver(r.deadline) ? C.coral : "inherit", fontWeight: isOver(r.deadline) ? 700 : 400, whiteSpace: 'nowrap' }}>{r.deadline || "—"}</td>
+            {showDeveloped && <td style={{ ...tdStyle, fontSize: 11, color: C.muted }}>{r.developedBy || "—"}</td>}
+            {showApproved  && <td style={{ ...tdStyle, fontSize: 11, color: C.muted }}>{r.approvedBy  || "—"}</td>}
+            <td style={tdStyle}><a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.amber, textDecoration: 'none', fontWeight: 600 }}>↗</a></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
     </div>;
   })}</div>;
 };
@@ -478,24 +696,28 @@ const Quality = ({ filtered }) => {
   return <div>
     <Card title="Quality Scores by Item" sub="Nulls excluded · applicable dimensions only · click name to open in Notion" mb={16}>
       {rated.length
-        ? <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-          <thead><tr>
-            {["Item", "DB", "Vertical", "Overall", ...dL].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase" }}>{h}</th>)}
-          </tr></thead>
-          <tbody>{rated.map(r => {
-            const vals = dims.map(d => parseR(r[d])).filter(v => v !== null);
-            const ov = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-            return <tr key={r.id}>
-              <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontWeight: 600 }}>
-                <a href={r.url} target="_blank" rel="noreferrer" style={{ color: C.forest, textDecoration: "none" }}>{r.name}</a>
-              </td>
-              <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}><Pill label={r.db} small /></td>
-              <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11 }}>{r.vertical || "—"}</td>
-              <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}>{ov !== null ? <Stars score={ov} /> : "—"}</td>
-              {dims.map(d => <td key={d} style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}>{parseR(r[d]) !== null ? <Stars score={parseR(r[d])} /> : <span style={{ fontSize: 10, color: C.dim }}>—</span>}</td>)}
-            </tr>;
-          })}</tbody>
-        </table>
+        ? <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead><tr>
+                {["Item", "DB", "Vertical", "Overall", ...dL, "Developed By", "Approved By"].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap' }}>{h}</th>)}
+              </tr></thead>
+              <tbody>{rated.map(r => {
+                const vals = dims.map(d => parseR(r[d])).filter(v => v !== null);
+                const ov = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+                return <tr key={r.id}>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontWeight: 600, maxWidth: 260 }}>
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ color: C.forest, textDecoration: "none" }}>{r.name}</a>
+                  </td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}><Pill label={r.db} small /></td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11 }}>{r.vertical || "—"}</td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}>{ov !== null ? <Stars score={ov} /> : "—"}</td>
+                  {dims.map(d => <td key={d} style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}>{parseR(r[d]) !== null ? <Stars score={parseR(r[d])} /> : <span style={{ fontSize: 10, color: C.dim }}>—</span>}</td>)}
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>{r.developedBy || "—"}</td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>{r.approvedBy  || "—"}</td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
         : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>No rated items yet — populate ratings in Notion</div>}
     </Card>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -592,11 +814,9 @@ const Search = ({ data }) => {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [dbFilter, setDbFilter] = useState("ALL");
-  const [vertFilter, setVertFilter] = useState("ALL");
 
   const DB_COLORS = { Themes: C.amber, "Sub-themes": C.plum, Indicators: C.olive, Questions: C.forest };
   const DBS = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
-  const VERTS = ["ALL", "REFLECT", "BOTH", "C4C"];
 
   const scoreItem = (item, terms, fullQ) => {
     const name  = (item.name   || "").toLowerCase();
@@ -617,12 +837,11 @@ const Search = ({ data }) => {
     const fullQ = submitted.trim().toLowerCase();
     const terms = fullQ.split(/\s+/).filter(Boolean);
     return data
-      .filter(r => dbFilter  === "ALL" || r.db       === dbFilter)
-      .filter(r => vertFilter === "ALL" || r.vertical === vertFilter)
+      .filter(r => dbFilter === "ALL" || r.db === dbFilter)
       .map(r => ({ ...r, _score: scoreItem(r, terms, fullQ) }))
       .filter(r => r._score > 0)
       .sort((a, b) => b._score - a._score);
-  }, [submitted, dbFilter, vertFilter, data]);
+  }, [submitted, dbFilter, data]);
 
   const run  = () => { if (query.trim()) setSubmitted(query); };
   const clear = () => { setQuery(""); setSubmitted(""); };
@@ -649,15 +868,9 @@ const Search = ({ data }) => {
           <button onClick={run} style={{ padding: "11px 24px", background: C.forest, color: C.white, border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}>Search</button>
           {submitted && <button onClick={clear} style={{ padding: "11px 14px", background: "transparent", color: C.muted, border: `1px solid ${C.cloud}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>✕</button>}
         </div>
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>Database</span>
-            {DBS.map(db => fBtn(db === "ALL" ? "All DBs" : db, db, dbFilter, setDbFilter))}
-          </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>Vertical</span>
-            {VERTS.map(v => fBtn(v === "ALL" ? "All" : v, v, vertFilter, setVertFilter))}
-          </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>Database</span>
+          {DBS.map(db => fBtn(db === "ALL" ? "All DBs" : db, db, dbFilter, setDbFilter))}
         </div>
       </div>
 
@@ -1080,6 +1293,19 @@ function App() {
   useEffect(() => { fetchData(); }, []);
   const discrepancies = useMemo(() => computeDiscrepancies(allData, platformData), [allData, platformData]);
 
+  // Derive owner options: always include NAMED_OWNERS as a baseline,
+  // plus anyone else found in live data (e.g. new people added in Notion)
+  const ownerOptions = useMemo(() => {
+    const fromData = allData.map(r => r.actionNeededBy).filter(Boolean);
+    const merged = [...new Set([...NAMED_OWNERS, ...fromData])].sort();
+    return ['ALL', ...merged];
+  }, [allData]);
+
+  // Reset oFilter if the current value is no longer in the live data options
+  React.useEffect(() => {
+    if (oFilter !== 'ALL' && !ownerOptions.includes(oFilter)) setOFilter('ALL');
+  }, [ownerOptions]);
+
   const filtered = allData.filter(r =>
     (vFilter === "ALL" || r.vertical === vFilter) &&
     (oFilter === "ALL" || r.actionNeededBy === oFilter) &&
@@ -1105,7 +1331,7 @@ function App() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            {[["Vertical", ["ALL", "C4C", "REFLECT", "BOTH"], vFilter, setVFilter], ["Owner", ["ALL", "Belinda", "Kate", "Both"], oFilter, setOFilter]].map(([label, opts, val, set]) => (
+            {[["Vertical", ["ALL", "C4C", "REFLECT", "BOTH"], vFilter, setVFilter], ["Owner", ownerOptions, oFilter, setOFilter]].map(([label, opts, val, set]) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
                 <select value={val} onChange={e => set(e.target.value)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
@@ -1177,8 +1403,8 @@ function App() {
         {tab === "pipeline" && <Pipeline filtered={filtered} />}
         {tab === "quality" && <Quality filtered={filtered} />}
         {tab === "hierarchy" && <Hierarchy vFilter={vFilter} data={allData} />}
-        {tab === "search" && <Search data={allData} />}
-        {tab === "velocity" && <Velocity data={allData} />}
+        {tab === "search" && <Search data={filtered} />}
+        {tab === "velocity" && <Velocity data={filtered} />}
         {tab === "platform" && <Platform data={platformData} />}
         {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={allData} platformData={platformData} />}
       </div>
