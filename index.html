@@ -563,10 +563,8 @@ const Overview = ({ filtered, discrepancies, allData }) => {
 
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
 const Today = ({ filtered, batchSize }) => {
-  const [done, setDone] = useState({});
-
   const buildBatch = (owner) => filtered
-    .filter(r => r.actionNeededBy === owner && r.requiresAction && r.requiresAction !== "No Action Required" && r.requiresAction !== "Ready to Publish" && !done[r.id])
+    .filter(r => r.actionNeededBy === owner && r.requiresAction && r.requiresAction !== "No Action Required" && r.requiresAction !== "Ready to Publish")
     .sort((a, b) => {
       if (isOver(a.deadline) !== isOver(b.deadline)) return isOver(a.deadline) ? -1 : 1;
       if (isWeek(a.deadline) !== isWeek(b.deadline)) return isWeek(a.deadline) ? -1 : 1;
@@ -575,16 +573,18 @@ const Today = ({ filtered, batchSize }) => {
     })
     .slice(0, batchSize);
 
-  // Derive active owners — only show columns for people who have items
-  const activeOwners = NAMED_OWNERS.filter(o => buildBatch(o).length > 0 || filtered.some(r => r.actionNeededBy === o && r.requiresAction && r.requiresAction !== "No Action Required"));
+  // Show a column for every owner who has at least one actionable item
+  const activeOwners = NAMED_OWNERS.filter(o =>
+    filtered.some(r => r.actionNeededBy === o && r.requiresAction && r.requiresAction !== "No Action Required")
+  );
 
   const BatchItem = ({ r, i, owner }) => {
     const cfg = PEOPLE[owner] || { color: C.muted };
     return (
-      <div style={{ background: C.off, borderRadius: 6, padding: "14px 16px", marginBottom: 8, borderLeft: `3px solid ${done[r.id] ? C.olive : cfg.color}`, display: "flex", alignItems: "flex-start", gap: 14, opacity: done[r.id] ? 0.5 : 1 }}>
+      <div style={{ background: C.off, borderRadius: 6, padding: "14px 16px", marginBottom: 8, borderLeft: `3px solid ${cfg.color}`, display: "flex", alignItems: "flex-start", gap: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.dim, minWidth: 24, paddingTop: 2 }}>{i + 1}</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.forest, lineHeight: 1.4 }}>{r.name}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.forest, lineHeight: 1.4, wordBreak: 'break-word' }}>{r.name}</div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             <Pill label={r.db} small />
             <Pill label={r.requiresAction} small />
@@ -595,17 +595,7 @@ const Today = ({ filtered, batchSize }) => {
           {r.approvedBy  && <div style={{ fontSize: 10, color: C.dim, marginTop: 1 }}>Approved by: <span style={{ fontWeight: 600 }}>{r.approvedBy}</span></div>}
           {r.notes && <div style={{ fontSize: 11, color: C.muted, marginTop: 4, fontStyle: "italic" }}>{r.notes.slice(0, 120)}{r.notes.length > 120 ? "…" : ""}</div>}
         </div>
-        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-          {done[r.id]
-            ? <span style={{ fontSize: 11, color: C.olive, fontWeight: 700 }}>✓ Done</span>
-            : owner === "Kate"
-              ? <>
-                  <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.olive, color: C.white, fontFamily: "inherit" }}>✓ Approve</button>
-                  <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.coral, color: C.white, fontFamily: "inherit" }}>↩ Revise</button>
-                </>
-              : <button onClick={() => setDone(d => ({ ...d, [r.id]: true }))} style={{ padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, border: "none", cursor: "pointer", background: C.amber, color: C.white, fontFamily: "inherit" }}>↑ Pass to Kate</button>
-          }
-        </div>
+        <a href={r.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, background: C.forest, color: C.white, textDecoration: "none", marginTop: 2 }}>Open in Notion ↗</a>
       </div>
     );
   };
@@ -663,14 +653,14 @@ const Pipeline = ({ filtered }) => {
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase" }}>{s}</span>
         <span style={{ fontSize: 12, fontWeight: 700, color: stageColor }}>{items.length}</span>
       </div>
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 380 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr>
             {["Item", "DB", "Owner", "Vertical", "Deadline",
               ...(showDeveloped ? ["Developed By"] : []),
               ...(showApproved  ? ["Approved By"]  : []),
               "Link"
-            ].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap' }}>{h}</th>)}
+            ].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap', position: 'sticky', top: 0, background: C.white, zIndex: 1 }}>{h}</th>)}
           </tr></thead>
           <tbody>{items.map(r => <tr key={r.id}>
             <td style={{ ...tdStyle, fontWeight: 600, maxWidth: 320 }}>{r.name}</td>
@@ -696,10 +686,10 @@ const Quality = ({ filtered }) => {
   return <div>
     <Card title="Quality Scores by Item" sub="Nulls excluded · applicable dimensions only · click name to open in Notion" mb={16}>
       {rated.length
-        ? <div style={{ overflowX: 'auto' }}>
+        ? <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 460 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
               <thead><tr>
-                {["Item", "DB", "Vertical", "Overall", ...dL, "Developed By", "Approved By"].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap' }}>{h}</th>)}
+                {["Item", "DB", "Vertical", "Overall", ...dL, "Developed By", "Approved By"].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap', position: 'sticky', top: 0, background: C.white, zIndex: 1 }}>{h}</th>)}
               </tr></thead>
               <tbody>{rated.map(r => {
                 const vals = dims.map(d => parseR(r[d])).filter(v => v !== null);
@@ -900,6 +890,7 @@ const Search = ({ data }) => {
             ))}
           </div>
 
+          <div style={{ maxHeight: 620, overflowY: 'auto' }}>
           {results.map((r, i) => {
             const col = DB_COLORS[r.db] || C.muted;
             const hasAction = r.requiresAction && r.requiresAction !== "No Action Required";
@@ -923,6 +914,7 @@ const Search = ({ data }) => {
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>
