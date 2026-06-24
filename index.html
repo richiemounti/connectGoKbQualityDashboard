@@ -148,17 +148,6 @@ const C = {
 };
 
 // ─── SEED DATA ────────────────────────────────────────────────────────────────
-const KB_THEMES = [
-  { id: "t1", name: "Social Legitimacy", url: "https://app.notion.com/p/31860bfb014e80cda468ec6727530176", status: "Published on Platform", vertical: "REFLECT", subCount: 5 },
-  { id: "t2", name: "Natural Resource Management", url: "https://app.notion.com/p/31060bfb014e80159061d8484ebd662e", status: "Published on Platform", vertical: "REFLECT", subCount: 8 },
-  { id: "t3", name: "Human-Wildlife Conflict", url: "https://app.notion.com/p/31060bfb014e80c4b3aef254befa8e4d", status: "Published on Platform", vertical: "REFLECT", subCount: 5 },
-  { id: "t4", name: "Benefit Sharing Mechanism", url: "https://app.notion.com/p/31060bfb014e8091bcd9e992141e9138", status: "Published on Platform", vertical: "REFLECT", subCount: 4 },
-  { id: "t5", name: "Transparency & Access to Information", url: "https://app.notion.com/p/31060bfb014e80feafbfe7acc733b872", status: "Published on Platform", vertical: "REFLECT", subCount: 3 },
-  { id: "t6", name: "User Rights and Land Tenure", url: "https://app.notion.com/p/31060bfb014e80289263f60a5c2af35d", status: "Published on Platform", vertical: "REFLECT", subCount: 4 },
-  { id: "t7", name: "Safeguarding & Ethical Standards", url: "https://app.notion.com/p/31060bfb014e805a9968f4a0b75b4630", status: "Published on Platform", vertical: "REFLECT", subCount: 5 },
-  { id: "t8", name: "Inclusive Decision Making & Participation", url: "https://app.notion.com/p/31060bfb014e80c08893ed07dace4a85", status: "Published on Platform", vertical: "REFLECT", subCount: 3 },
-];
-
 const SEED_DATA = [
   // ── REFLECT Sub-themes (Ruvuma review) ──────────────────────────────────────
   { id: "s1", db: "Sub-themes", name: "Institutional Trust and Legitimacy", themeId: "t1", vertical: "REFLECT", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-21", taxonomic: 1, construct: 1, design: 1, notes: "Flagged for retirement — all questions have existing KB homes in Social Legitimacy", url: "https://app.notion.com/p/36860bfb014e8118acb4c36e069e0227" },
@@ -741,62 +730,165 @@ const Quality = ({ filtered }) => {
 };
 
 // ─── HIERARCHY TAB ────────────────────────────────────────────────────────────
-const HierTheme = ({ theme, subs }) => {
+// Sub-theme row — expandable, shows indicators + questions inside
+const HierarchySub = ({ sub, indicators, questions }) => {
   const [open, setOpen] = useState(false);
-  const [openSubs, setOpenSubs] = useState({});
-  const issueCount = subs.filter(s => s.requiresAction && s.requiresAction !== "No Action Required").length;
-  const toggleSub = id => setOpenSubs(p => ({ ...p, [id]: !p[id] }));
+  const hasAction = sub.requiresAction && sub.requiresAction !== 'No Action Required';
 
-  return <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, overflow: "hidden", color: C.white }}>
-    <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
-      <span style={{ fontSize: 9, transition: "transform 0.15s", transform: open ? "rotate(90deg)" : "none", color: "rgba(255,255,255,0.4)" }}>▶</span>
-      <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{theme.name}</span>
-      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginLeft: 4 }}>{theme.subCount} sub-themes</span>
-      {issueCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: "rgba(238,92,95,0.25)", color: "#f8a0a2" }}>⚠ {issueCount} need action</span>}
-      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: "rgba(133,135,85,0.25)", color: "#c8d89a", marginLeft: 8 }}>{theme.status}</span>
-      <a href={theme.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginLeft: 8, textDecoration: "none" }}>↗</a>
-    </div>
-    {open && <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "10px 12px" }}>
-      <div style={{ borderLeft: "2px dashed rgba(255,255,255,0.1)", paddingLeft: 10, marginLeft: 6 }}>
-        {subs.length ? subs.map(s => {
-          const hasAction = s.requiresAction && s.requiresAction !== "No Action Required";
-          return <div key={s.id} style={{ borderRadius: 4, marginBottom: 5, overflow: "hidden", background: "rgba(255,255,255,0.04)", borderLeft: hasAction ? "2px solid rgba(238,92,95,0.5)" : "none" }}>
-            <div onClick={() => toggleSub(s.id)} style={{ padding: "9px 12px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <span style={{ fontSize: 9, transition: "transform 0.15s", transform: openSubs[s.id] ? "rotate(90deg)" : "none", color: "rgba(255,255,255,0.4)" }}>▶</span>
-              <span style={{ fontSize: 12, fontWeight: 600, flex: 1, color: "rgba(255,255,255,0.85)" }}>{s.name}</span>
-              {hasAction
-                ? s.requiresAction === "Awaiting Sign-off"
-                  ? <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 2, background: "rgba(205,128,40,0.3)", color: "#ffc880" }}>Sign-off: {s.actionNeededBy}</span>
-                  : <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 2, background: "rgba(238,92,95,0.3)", color: "#ffa0a2" }}>⚠ {s.requiresAction}</span>
-                : <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 2, background: "rgba(133,135,85,0.25)", color: "#c8d89a" }}>✓ OK</span>}
-              {s.actionNeededBy && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: s.actionNeededBy === "Kate" ? "rgba(205,128,40,0.2)" : "rgba(133,135,85,0.2)", color: s.actionNeededBy === "Kate" ? "#ffc880" : "#c8d89a" }}>{s.actionNeededBy}</span>}
-              <a href={s.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", textDecoration: "none", flexShrink: 0 }}>↗</a>
-            </div>
-            {openSubs[s.id] && <div style={{ padding: "6px 12px 10px 28px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Status: {s.status}</span>
-                {s.taxonomic && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Tax: {s.taxonomic}/5</span>}
-                {s.construct && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Construct: {s.construct}/5</span>}
-                {s.design && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>Design: {s.design}/5</span>}
-              </div>
-              {s.notes && <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", fontStyle: "italic", lineHeight: 1.5 }}>{s.notes}</div>}
-              <div style={{ marginTop: 8, fontSize: 11, color: "rgba(255,255,255,0.25)", fontStyle: "italic" }}>Indicators and questions visible when connected to live Notion data</div>
-            </div>}
-          </div>;
-        }) : <div style={{ padding: "8px 12px", fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>No sub-themes with QA data in current filter</div>}
+  return (
+    <div style={{ borderRadius: 4, marginBottom: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', borderLeft: hasAction ? '2px solid rgba(238,92,95,0.6)' : 'none' }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+        <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>▶</span>
+        <span style={{ fontSize: 12, fontWeight: 600, flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.85)', wordBreak: 'break-word', lineHeight: 1.35 }}>{sub.name}</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{indicators.length}i · {questions.length}q</span>
+        {hasAction
+          ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 2, background: 'rgba(238,92,95,0.25)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>⚠ {sub.requiresAction}</span>
+          : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 2, background: 'rgba(133,135,85,0.2)', color: '#c8d89a', flexShrink: 0 }}>✓</span>}
+        {sub.actionNeededBy && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 2, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{sub.actionNeededBy}</span>}
+        <a href={sub.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
       </div>
-    </div>}
-  </div>;
+      {open && (
+        <div style={{ padding: '6px 12px 10px 28px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Meta row */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            {sub.status    && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Status: {sub.status}</span>}
+            {sub.vertical  && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Vertical: {sub.vertical}</span>}
+            {sub.taxonomic   != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Tax: {sub.taxonomic}/5</span>}
+            {sub.completeness!= null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Complete: {sub.completeness}/5</span>}
+            {sub.construct   != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Construct: {sub.construct}/5</span>}
+            {sub.design      != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Design: {sub.design}/5</span>}
+            {sub.approvedBy  && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Approved by: {sub.approvedBy}</span>}
+          </div>
+          {sub.notes && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 10 }}>{sub.notes}</div>}
+          {/* Indicators */}
+          {indicators.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 4 }}>Indicators ({indicators.length})</div>
+              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                {indicators.map(ind => (
+                  <div key={ind.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, lineHeight: 1.4, wordBreak: 'break-word' }}>{ind.name}</span>
+                    {ind.requiresAction && ind.requiresAction !== 'No Action Required' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{ind.requiresAction}</span>}
+                    {ind.developedBy && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{ind.developedBy}</span>}
+                    <a href={ind.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Questions */}
+          {questions.length > 0 && (
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 4 }}>Questions ({questions.length})</div>
+              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                {questions.map(q => (
+                  <div key={q.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, lineHeight: 1.4, wordBreak: 'break-word' }}>{q.name}</span>
+                    {q.requiresAction && q.requiresAction !== 'No Action Required' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{q.requiresAction}</span>}
+                    <a href={q.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {indicators.length === 0 && questions.length === 0 && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>No indicators or questions linked in current filter</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
-const Hierarchy = ({ vFilter, data }) => {
-  const themes = KB_THEMES.filter(t => vFilter === "ALL" || t.vertical === vFilter);
-  return <div>
-    <div style={{ marginBottom: 16, padding: "14px 16px", background: "rgba(81,20,51,0.08)", borderRadius: 6, borderLeft: `3px solid ${C.plum}`, fontSize: 13, color: C.muted }}>
-      <strong style={{ color: C.plum }}>Hierarchy View</strong> — Theme → Sub-theme chain. ⚠ flags items needing action. Click ▶ to expand, ↗ to open in Notion directly.
+// Theme row — expandable, contains sub-themes
+const HierarchyTheme = ({ theme, subthemes, indsBySubtheme, qsBySubtheme }) => {
+  const [open, setOpen] = useState(false);
+  const actionCount = subthemes.filter(s => s.requiresAction && s.requiresAction !== 'No Action Required').length;
+  const indTotal = subthemes.reduce((n, s) => n + (indsBySubtheme.get(s.id) || []).length, 0);
+  const qTotal   = subthemes.reduce((n, s) => n + (qsBySubtheme.get(s.id)   || []).length, 0);
+
+  return (
+    <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, overflow: 'hidden', color: C.white }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+        <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>▶</span>
+        <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{theme.name}</span>
+        {theme.vertical && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 2, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>{theme.vertical}</span>}
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{subthemes.length} sub · {indTotal}i · {qTotal}q</span>
+        {actionCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 2, background: 'rgba(238,92,95,0.25)', color: '#f8a0a2', flexShrink: 0 }}>⚠ {actionCount}</span>}
+        {theme.status && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 2, background: 'rgba(133,135,85,0.25)', color: '#c8d89a', flexShrink: 0 }}>{theme.status}</span>}
+        <a href={theme.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+      </div>
+      {open && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px' }}>
+          <div style={{ borderLeft: '2px dashed rgba(255,255,255,0.1)', paddingLeft: 10, marginLeft: 6 }}>
+            {subthemes.length > 0
+              ? subthemes.map(s => <HierarchySub key={s.id} sub={s} indicators={indsBySubtheme.get(s.id) || []} questions={qsBySubtheme.get(s.id) || []} />)
+              : <div style={{ padding: '8px 12px', fontSize: 12, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>No sub-themes in current filter</div>}
+          </div>
+        </div>
+      )}
     </div>
-    {themes.map(theme => <HierTheme key={theme.id} theme={theme} subs={data.filter(s => s.themeId === theme.id)} />)}
-  </div>;
+  );
+};
+
+const Hierarchy = ({ data }) => {
+  const themes     = data.filter(r => r.db === 'Themes');
+  const subthemes  = data.filter(r => r.db === 'Sub-themes');
+  const indicators = data.filter(r => r.db === 'Indicators');
+  const questions  = data.filter(r => r.db === 'Questions');
+
+  // Build lookup maps from Notion relation URLs
+  const subsByTheme = new Map();
+  subthemes.forEach(s => {
+    if (!s.themeId) return;
+    if (!subsByTheme.has(s.themeId)) subsByTheme.set(s.themeId, []);
+    subsByTheme.get(s.themeId).push(s);
+  });
+
+  const indsBySubtheme = new Map();
+  indicators.forEach(ind => {
+    if (!ind.subthemeId) return;
+    if (!indsBySubtheme.has(ind.subthemeId)) indsBySubtheme.set(ind.subthemeId, []);
+    indsBySubtheme.get(ind.subthemeId).push(ind);
+  });
+
+  const qsBySubtheme = new Map();
+  questions.forEach(q => {
+    if (!q.subthemeId) return;
+    if (!qsBySubtheme.has(q.subthemeId)) qsBySubtheme.set(q.subthemeId, []);
+    qsBySubtheme.get(q.subthemeId).push(q);
+  });
+
+  // Sub-themes with no matching theme in current data
+  const linkedSubIds = new Set(subthemes.filter(s => s.themeId && themes.some(t => t.id === s.themeId)).map(s => s.id));
+  const orphanSubs   = subthemes.filter(s => !linkedSubIds.has(s.id));
+
+  if (themes.length === 0 && subthemes.length === 0) {
+    return <div style={{ textAlign: 'center', padding: 60, color: C.dim, fontStyle: 'italic' }}>No data — sync from Notion to populate the hierarchy</div>;
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16, padding: '14px 16px', background: 'rgba(81,20,51,0.08)', borderRadius: 6, borderLeft: `3px solid ${C.plum}`, fontSize: 13, color: C.muted }}>
+        <strong style={{ color: C.plum }}>Hierarchy View</strong> — Theme → Sub-theme → Indicators + Questions. Fully driven by live Notion data. Click ▶ to expand, ↗ to open in Notion.
+      </div>
+      {themes.map(theme => (
+        <HierarchyTheme key={theme.id} theme={theme} subthemes={subsByTheme.get(theme.id) || []} indsBySubtheme={indsBySubtheme} qsBySubtheme={qsBySubtheme} />
+      ))}
+      {orphanSubs.length > 0 && (
+        <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, color: C.white, opacity: 0.75 }}>
+          <div style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>
+            Sub-themes (theme not in current filter) — {orphanSubs.length}
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px' }}>
+            <div style={{ borderLeft: '2px dashed rgba(255,255,255,0.1)', paddingLeft: 10, marginLeft: 6 }}>
+              {orphanSubs.map(s => <HierarchySub key={s.id} sub={s} indicators={indsBySubtheme.get(s.id) || []} questions={qsBySubtheme.get(s.id) || []} />)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─── SEARCH TAB ───────────────────────────────────────────────────────────────
@@ -1394,7 +1486,7 @@ function App() {
         {tab === "today" && <Today filtered={filtered} batchSize={batchSize} />}
         {tab === "pipeline" && <Pipeline filtered={filtered} />}
         {tab === "quality" && <Quality filtered={filtered} />}
-        {tab === "hierarchy" && <Hierarchy vFilter={vFilter} data={allData} />}
+        {tab === "hierarchy" && <Hierarchy data={filtered} />}
         {tab === "search" && <Search data={filtered} />}
         {tab === "velocity" && <Velocity data={filtered} />}
         {tab === "platform" && <Platform data={platformData} />}
