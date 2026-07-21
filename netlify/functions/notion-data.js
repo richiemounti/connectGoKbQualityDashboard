@@ -65,14 +65,38 @@ function extractPeopleNames(prop) {
   return people.length ? people.map(p => p.name).join(', ') : null;
 }
 
-// Normalize vertical values so all DBs use the same token set.
-// Sub-themes uses "BOTH: C4C AND REFLECT"; everything else uses "BOTH".
-function normalizeVertical(raw) {
-  if (!raw) return null;
-  if (raw.toUpperCase().includes('BOTH')) return 'BOTH';
-  return raw;
+// Multi-select → array of names (used by Themes)
+function extractMultiSelect(prop) {
+  const arr = prop?.multi_select;
+  return Array.isArray(arr) ? arr.map(o => o.name) : [];
+}
+function extractRollupMultiSelect(prop) {
+  const arr = prop?.rollup?.array;
+  if (!Array.isArray(arr)) return [];
+  const names = [];
+  for (const item of arr) {
+    if (item?.type === 'multi_select' && Array.isArray(item.multi_select)) {
+      names.push(...item.multi_select.map(o => o.name));
+    } else if (item?.type === 'select' && item.select?.name) {
+      names.push(item.select.name);
+    }
+  }
+  return [...new Set(names)]; // dedupe
 }
 
+// Normalize vertical values so all DBs use the same token set.
+// Sub-themes uses "BOTH: C4C AND REFLECT"; everything else uses "BOTH".
+function normalizeVerticals(names) {
+  if (!Array.isArray(names)) return [];
+  const out = names.map(n => {
+    const v = (n || '').trim();
+    if (/^rfc$/i.test(v)) return 'RfC';
+    if (/^c4c$/i.test(v)) return 'C4C';
+    if (/^rfn$/i.test(v)) return 'RfN';
+    return v; // pass through anything unrecognized
+  });
+  return [...new Set(out.filter(Boolean))];
+}
 async function queryDatabase(databaseId, token) {
   const results = [];
   let cursor = undefined;
