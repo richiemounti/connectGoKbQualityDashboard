@@ -20,6 +20,12 @@ function extractSelect(prop) {
   return prop?.select?.name ?? null;
 }
 
+// Vertical is a multi-select on Themes/Sub-themes/Indicators — an item can carry
+// more than one of RfC / C4C / RfN at once. Always returns an array (possibly empty).
+function extractMultiSelect(prop) {
+  return prop?.multi_select?.map(v => v.name) ?? [];
+}
+
 function extractStatus(prop) {
   return prop?.status?.name ?? null;
 }
@@ -59,18 +65,23 @@ function extractFormula(prop) {
   return null;
 }
 
+// Questions don't have their own Vertical multi-select — it's a formula field
+// (still named "Vertical ", trailing space) that concatenates the tags rolled up
+// from the linked Subtheme's multi-select, e.g. "RfC, C4C". Split it back into
+// an array so Questions match the same array shape as Themes/Sub-themes/Indicators.
+function extractFormulaVerticalArray(prop) {
+  const raw = extractFormula(prop);
+  if (!raw) return [];
+  return raw
+    .split(/,|&|\band\b/i)
+    .map(v => v.trim())
+    .filter(Boolean);
+}
+
 // People field — returns comma-joined display names, or null
 function extractPeopleNames(prop) {
   const people = prop?.people || [];
   return people.length ? people.map(p => p.name).join(', ') : null;
-}
-
-// Normalize vertical values so all DBs use the same token set.
-// Sub-themes uses "BOTH: C4C AND REFLECT"; everything else uses "BOTH".
-function normalizeVertical(raw) {
-  if (!raw) return null;
-  if (raw.toUpperCase().includes('BOTH')) return 'BOTH';
-  return raw;
 }
 
 async function queryDatabase(databaseId, token) {
@@ -125,7 +136,7 @@ function mapPage(page, dbName) {
       id, db: 'Themes', url,
       name: extractTitle(props['Theme Name']),
       status: extractStatus(props['Theme Status']),
-      vertical: normalizeVertical(extractSelect(props['Vertical'])),
+      vertical: extractMultiSelect(props['Vertical']),
       approvedBy: null,
       developedBy: null,
       ...commonQaFields(props),
@@ -140,8 +151,7 @@ function mapPage(page, dbName) {
       id, db: 'Sub-themes', url,
       name: extractTitle(props['Sub-theme name']),
       status: extractStatus(props['Subtheme Status']),
-      // Sub-themes uses "BOTH: C4C AND REFLECT" — normalise to "BOTH"
-      vertical: normalizeVertical(extractSelect(props['Vertical'])),
+      vertical: extractMultiSelect(props['Vertical']),
       approvedBy: extractPeopleNames(props['Approved By']),
       developedBy: null,
       ...commonQaFields(props),
@@ -156,7 +166,7 @@ function mapPage(page, dbName) {
       id, db: 'Indicators', url,
       name: extractTitle(props['Indicator statement']),
       status: extractStatus(props['Status']),
-      vertical: normalizeVertical(extractSelect(props['Vertical'])),
+      vertical: extractMultiSelect(props['Vertical']),
       approvedBy: null,
       developedBy: extractPeopleNames(props['Developed By']),
       ...commonQaFields(props),
@@ -167,13 +177,14 @@ function mapPage(page, dbName) {
   }
 
   if (dbName === 'Questions') {
-    // Vertical is a formula field named "Vertical " (trailing space) derived from linked Subtheme
+    // Vertical is a formula field named "Vertical " (trailing space) that concatenates
+    // the multi-select tags rolled up from the linked Subtheme — parsed back into an array.
     return {
       id, db: 'Questions', url,
       name: extractTitle(props['Question Text']),
       // Question Status is a select (not a status widget) — use extractSelect
       status: extractSelect(props['Question Status']),
-      vertical: normalizeVertical(extractFormula(props['Vertical '])),
+      vertical: extractFormulaVerticalArray(props['Vertical ']),
       approvedBy: null,
       developedBy: null,
       ...commonQaFields(props),
