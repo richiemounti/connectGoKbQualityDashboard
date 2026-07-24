@@ -8,13 +8,12 @@
 //   BACKEND_API_URL         — e.g. https://your-backend.com
 //   KNOWLEDGEBASE_API_KEY   — must match the value set in the backend .env
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-let cache = { data: null, timestamp: 0 };
-
 exports.handler = async function (event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    'Netlify-CDN-Cache-Control': 'no-store',
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -32,12 +31,6 @@ exports.handler = async function (event) {
         error: 'BACKEND_API_URL or KNOWLEDGEBASE_API_KEY environment variable is not set',
       }),
     };
-  }
-
-  // Serve from cache if still fresh
-  const now = Date.now();
-  if (cache.data && now - cache.timestamp < CACHE_TTL) {
-    return { statusCode: 200, headers, body: JSON.stringify(cache.data) };
   }
 
   // Forward the includeAll query param if the dashboard passes it
@@ -58,7 +51,6 @@ exports.handler = async function (event) {
     }
 
     const data = await response.json();
-    cache = { data, timestamp: now };
 
     return { statusCode: 200, headers, body: JSON.stringify(data) };
   } catch (err) {

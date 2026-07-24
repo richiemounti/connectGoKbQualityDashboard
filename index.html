@@ -556,11 +556,11 @@ const Overview = ({ filtered, discrepancies, allData }) => {
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
 const Today = ({ filtered, batchSize }) => {
   const buildBatch = (owner) => filtered
-    .filter(r => r.actionNeededBy.includes(owner) && r.requiresAction && r.requiresAction !== "No Action Required" && r.requiresAction !== "Ready to Publish")
+    .filter(r => r.actionNeededBy.includes(owner) && r.requiresAction && r.requiresAction !== "No Action Required")
     .sort((a, b) => {
+      // Overdue first, then soonest/most-recent deadline, then undated last.
       if (isOver(a.deadline) !== isOver(b.deadline)) return isOver(a.deadline) ? -1 : 1;
-      if (isWeek(a.deadline) !== isWeek(b.deadline)) return isWeek(a.deadline) ? -1 : 1;
-      if (a.deadline && b.deadline) return a.deadline > b.deadline ? 1 : -1;
+      if (a.deadline && b.deadline) return a.deadline < b.deadline ? -1 : 1;
       return a.deadline ? -1 : b.deadline ? 1 : 0;
     })
     .slice(0, batchSize);
@@ -1351,7 +1351,7 @@ function App() {
 
   const fetchData = () => {
     setSyncing(true);
-    fetch("/.netlify/functions/notion-data")
+    fetch("/.netlify/functions/notion-data", { cache: "no-store" })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => {
         const items = normItems(Array.isArray(data) ? data : SEED_DATA);
@@ -1367,7 +1367,7 @@ function App() {
       })
       .finally(() => setSyncing(false));
 
-    fetch("/.netlify/functions/backend-data")
+    fetch("/.netlify/functions/backend-data", { cache: "no-store" })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => setPlatformData(data))
       .catch(() => setPlatformData(null));
@@ -1418,7 +1418,7 @@ function App() {
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
                 <select value={val} onChange={e => set(e.target.value)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
-                  {opts.map(o => <option key={o} value={o} style={{ background: C.forest }}>{o}</option>)}
+                  {opts.map(o => <option key={o} value={o} style={{ background: C.forest, color: C.white }}>{o}</option>)}
                 </select>
               </div>
             ))}

@@ -8,10 +8,6 @@ const DATABASES = {
   Questions: '30a60bfb-014e-8042-a72c-c6c14c2ef065',
 };
 
-// 5-minute in-memory cache
-let cache = { data: null, timestamp: 0 };
-const CACHE_TTL = 5 * 60 * 1000;
-
 function notionPageUrl(id) {
   return `https://notion.so/${id.replace(/-/g, '')}`;
 }
@@ -216,6 +212,10 @@ exports.handler = async function (event) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
+    // Never let the browser or Netlify's CDN serve a stale copy — always
+    // reflect the current state of Notion.
+    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+    'Netlify-CDN-Cache-Control': 'no-store',
   };
 
   if (event.httpMethod === 'OPTIONS') {
@@ -229,11 +229,6 @@ exports.handler = async function (event) {
       headers,
       body: JSON.stringify({ error: 'NOTION_TOKEN environment variable is not set' }),
     };
-  }
-
-  const now = Date.now();
-  if (cache.data && now - cache.timestamp < CACHE_TTL) {
-    return { statusCode: 200, headers, body: JSON.stringify(cache.data) };
   }
 
   try {
@@ -269,8 +264,6 @@ exports.handler = async function (event) {
         item.vertical = subVert[bareId(item.subthemeId)] || [];
       }
     }
-
-    cache = { data: allItems, timestamp: now };
 
     return { statusCode: 200, headers, body: JSON.stringify(allItems) };
   } catch (err) {
