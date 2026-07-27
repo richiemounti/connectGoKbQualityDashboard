@@ -8,6 +8,14 @@ const DATABASES = {
   Questions: '30a60bfb-014e-8042-a72c-c6c14c2ef065',
 };
 
+// Retry tuning. 3 retries with exponential backoff (400ms, 800ms, 1600ms)
+// comfortably absorbs a transient Notion 429/5xx without pushing us near the
+// function timeout.
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 400;
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 function notionPageUrl(id) {
   return `https://notion.so/${id.replace(/-/g, '')}`;
 }
@@ -92,21 +100,65 @@ function extractPeopleNames(prop) {
   return people.length ? people.map(p => p.name).join(', ') : null;
 }
 
+// Wraps fetch with retry/backoff for transient failures only.
+//   - Network errors and 429 / 5xx  → retried with exponential backoff
+//     (honouring Retry-After on a 429 when present).
+//   - 400 / 401 / 403 / 404         → returned immediately; retrying a bad
+//     token, database id, or missing integration access never helps, and we
+//     want to fail fast so the real cause surfaces in the error body.
+async function fetchWithRetry(url, options, label) {
+  let lastErr;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      if (response.ok) return response;
+
+      // Permanent client error — don't retry, let the caller read it.
+      if (response.status !== 429 && response.status < 500) {
+        return response;
+      }
+
+      // Transient (429 / 5xx).
+      lastErr = new Error(`${label} ${response.status}`);
+      if (attempt >= MAX_RETRIES) return response;
+
+      const retryAfter = Number(response.headers.get('retry-after'));
+      const wait = Number.isFinite(retryAfter) && retryAfter > 0
+        ? retryAfter * 1000
+        : BASE_DELAY_MS * 2 ** attempt;
+      await sleep(wait);
+    } catch (err) {
+      // Network-level failure (DNS, socket, abort) — retry.
+      lastErr = err;
+      if (attempt >= MAX_RETRIES) throw lastErr;
+      await sleep(BASE_DELAY_MS * 2 ** attempt);
+    }
+  }
+
+  throw lastErr;
+}
+
 async function queryDatabase(databaseId, token) {
   const results = [];
   let cursor = undefined;
 
   do {
     const body = cursor ? JSON.stringify({ start_cursor: cursor }) : '{}';
-    const response = await fetch(`${NOTION_API_BASE}/databases/${databaseId}/query`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Notion-Version': NOTION_VERSION,
-        'Content-Type': 'application/json',
+    const response = await fetchWithRetry(
+      `${NOTION_API_BASE}/databases/${databaseId}/query`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Notion-Version': NOTION_VERSION,
+          'Content-Type': 'application/json',
+        },
+        body,
       },
-      body,
-    });
+      `Notion API (DB ${databaseId})`,
+    );
 
     if (!response.ok) {
       const text = await response.text();
@@ -232,15 +284,24 @@ exports.handler = async function (event) {
   }
 
   try {
-    const allItems = [];
+    // The four databases are independent, so fetch them concurrently rather
+    // than one-after-another. This roughly quarters the wall-clock time and is
+    // the main defence against tripping the function timeout (which was the
+    // cause of the intermittent "Demo mode" fallback).
+    const dbEntries = Object.entries(DATABASES);
+    const pagesPerDb = await Promise.all(
+      dbEntries.map(([, dbId]) => queryDatabase(dbId, token)),
+    );
 
-    for (const [dbName, dbId] of Object.entries(DATABASES)) {
-      const pages = await queryDatabase(dbId, token);
-      for (const page of pages) {
+    // Map in the original DB order (Themes → Sub-themes → Indicators → Questions)
+    // so output ordering stays stable.
+    const allItems = [];
+    dbEntries.forEach(([dbName], i) => {
+      for (const page of pagesPerDb[i]) {
         const mapped = mapPage(page, dbName);
         if (mapped) allItems.push(mapped);
       }
-    }
+    });
 
     // Verticals live only on Themes (a reliable multi-select). Everything below
     // derives by walking relations, because the rollups return <omitted /> via the
