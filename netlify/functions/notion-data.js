@@ -177,6 +177,7 @@ function commonQaFields(props) {
   return {
     requiresAction: extractSelect(props['Requires Action']),
     actionNeededBy: extractMultiSelect(props['Action Needed By']),
+    assignedBy: extractSelect(props['Assigned by']),
     deadline: extractDate(props['Action Deadline']),
     taxonomic: extractRating(props['Taxonomic Thinking ★']),
     completeness: extractRating(props['Completeness ★']),
