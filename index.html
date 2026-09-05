@@ -1361,18 +1361,26 @@ function App() {
   const fetchData = () => {
     setSyncing(true);
     fetch("/.netlify/functions/notion-data", { cache: "no-store" })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(async r => {
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(payload.error || `Notion function returned ${r.status}`);
+        if (!Array.isArray(payload)) throw new Error("Notion function returned an invalid response");
+        return payload;
+      })
       .then(data => {
-        const items = normItems(Array.isArray(data) ? data : SEED_DATA);
+        const items = normItems(data);
         setAllData(items);
         const counts = items.reduce((acc, item) => { acc[item.db] = (acc[item.db] || 0) + 1; return acc; }, {});
         setDbCounts(counts);
         setSyncMsg(`Live · ${items.length} QA items · ${new Date().toLocaleTimeString()}`);
       })
-      .catch(() => {
-        setAllData(normItems(SEED_DATA));
+      .catch(error => {
+        const isLocalPreview = window.location.protocol === "file:";
+        setAllData(isLocalPreview ? normItems(SEED_DATA) : []);
         setDbCounts(null);
-        setSyncMsg("Demo mode · Notion function unavailable");
+        setSyncMsg(isLocalPreview
+          ? "Local preview · deploy to use live Notion data"
+          : `Live data unavailable · ${error.message}`);
       })
       .finally(() => setSyncing(false));
 
@@ -1395,7 +1403,7 @@ function App() {
 
   const assignedByOptions = useMemo(() => {
     const fromData = allData.map(r => r.assignedBy).filter(Boolean);
-    const merged = [...new Set([...NAMED_OWNERS, ...fromData])].sort();
+    const merged = [...new Set(fromData)].sort();
     return ['ALL', ...merged];
   }, [allData]);
 
@@ -1437,7 +1445,7 @@ function App() {
             {[["Vertical", ["ALL", "RfC", "RfN", "C4C"], vFilter, setVFilter], ["Action Needed By", ownerOptions, oFilter, setOFilter], ["Assigned by", assignedByOptions, assignedByFilter, setAssignedByFilter]].map(([label, opts, val, set]) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
-                <select value={val} onChange={e => set(e.target.value)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
+                <select value={val} onChange={e => set(e.target.value)} disabled={label === "Assigned by" && opts.length === 1} title={label === "Assigned by" && opts.length === 1 ? "Assigned by values appear when live Notion data is loaded." : undefined} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: label === "Assigned by" && opts.length === 1 ? "not-allowed" : "pointer", outline: "none", opacity: label === "Assigned by" && opts.length === 1 ? 0.55 : 1 }}>
                   {opts.map(o => <option key={o} value={o} style={{ background: C.forest, color: C.white }}>{o}</option>)}
                 </select>
               </div>
