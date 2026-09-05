@@ -1,5 +1,5 @@
 const NOTION_API_BASE = 'https://api.notion.com/v1';
-const NOTION_VERSION = '2022-06-28';
+const NOTION_VERSION = '2026-03-11';
 
 const DATABASES = {
   Themes: '30a60bfb-014e-8041-a28d-d7477d55e4db',
@@ -13,6 +13,10 @@ const DATABASES = {
 // function timeout.
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 400;
+
+// A Netlify function instance can serve more than one request. Keeping these
+// identifiers avoids resolving the same data source on every refresh.
+const dataSourceIdCache = new Map();
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -30,6 +34,18 @@ function bareId(u) {
 
 function extractSelect(prop) {
   return prop?.select?.name ?? null;
+}
+
+// Notion property labels are user-managed. Resolve case and surrounding-space
+// differences defensively so a presentation edit cannot silently empty this field.
+function getProperty(props, name) {
+  if (!props) return undefined;
+  if (props[name]) return props[name];
+  const wanted = String(name).trim().toLocaleLowerCase();
+  const match = Object.entries(props).find(([key]) =>
+    String(key).trim().toLocaleLowerCase() === wanted,
+  );
+  return match?.[1];
 }
 
 // Vertical is a multi-select on Themes/Sub-themes/Indicators — an item can carry
@@ -140,14 +156,62 @@ async function fetchWithRetry(url, options, label) {
   throw lastErr;
 }
 
+async function resolveDataSourceId(databaseId, token) {
+  if (dataSourceIdCache.has(databaseId)) return dataSourceIdCache.get(databaseId);
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    'Notion-Version': NOTION_VERSION,
+  };
+
+  // Accept a data-source id directly as well as the database id copied from a
+  // Notion database URL. This keeps the function compatible with either form.
+  const directResponse = await fetchWithRetry(
+    `${NOTION_API_BASE}/data_sources/${databaseId}`,
+    { method: 'GET', headers },
+    `Notion API (data source ${databaseId})`,
+  );
+
+  if (directResponse.ok) {
+    dataSourceIdCache.set(databaseId, databaseId);
+    return databaseId;
+  }
+
+  if (![400, 404].includes(directResponse.status)) {
+    const text = await directResponse.text();
+    throw new Error(`Notion API ${directResponse.status} while reading data source ${databaseId}: ${text}`);
+  }
+
+  const databaseResponse = await fetchWithRetry(
+    `${NOTION_API_BASE}/databases/${databaseId}`,
+    { method: 'GET', headers },
+    `Notion API (database ${databaseId})`,
+  );
+
+  if (!databaseResponse.ok) {
+    const text = await databaseResponse.text();
+    throw new Error(`Notion API ${databaseResponse.status} while reading database ${databaseId}: ${text}`);
+  }
+
+  const database = await databaseResponse.json();
+  const dataSourceId = database.data_sources?.[0]?.id;
+  if (!dataSourceId) {
+    throw new Error(`No data source found for Notion database ${databaseId}`);
+  }
+
+  dataSourceIdCache.set(databaseId, dataSourceId);
+  return dataSourceId;
+}
+
 async function queryDatabase(databaseId, token) {
   const results = [];
   let cursor = undefined;
+  const dataSourceId = await resolveDataSourceId(databaseId, token);
 
   do {
     const body = cursor ? JSON.stringify({ start_cursor: cursor }) : '{}';
     const response = await fetchWithRetry(
-      `${NOTION_API_BASE}/databases/${databaseId}/query`,
+      `${NOTION_API_BASE}/data_sources/${dataSourceId}/query`,
       {
         method: 'POST',
         headers: {
@@ -157,12 +221,12 @@ async function queryDatabase(databaseId, token) {
         },
         body,
       },
-      `Notion API (DB ${databaseId})`,
+      `Notion API (data source ${dataSourceId})`,
     );
 
     if (!response.ok) {
       const text = await response.text();
-      throw new Error(`Notion API ${response.status} on DB ${databaseId}: ${text}`);
+      throw new Error(`Notion API ${response.status} while querying data source ${dataSourceId}: ${text}`);
     }
 
     const data = await response.json();
@@ -177,7 +241,7 @@ function commonQaFields(props) {
   return {
     requiresAction: extractSelect(props['Requires Action']),
     actionNeededBy: extractMultiSelect(props['Action Needed By']),
-    assignedBy: extractSelect(props['Assigned by']),
+    assignedBy: extractSelect(getProperty(props, 'Assigned by')),
     deadline: extractDate(props['Action Deadline']),
     taxonomic: extractRating(props['Taxonomic Thinking ★']),
     completeness: extractRating(props['Completeness ★']),
