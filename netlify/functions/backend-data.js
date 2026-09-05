@@ -1,12 +1,11 @@
 // netlify/functions/backend-data.js
 //
 // Fetches the full knowledgebase export from the SMRV backend API and returns it
-// to the dashboard. Proxies the request server-side so the API key is never
-// exposed to the browser.
+// to the dashboard. The API key stays server-side and is never sent to browsers.
 //
-// Required environment variables (set in Netlify → Site configuration → Environment variables):
-//   BACKEND_API_URL         — e.g. https://your-backend.com
-//   KNOWLEDGEBASE_API_KEY   — must match the value set in the backend .env
+// Required Netlify environment variables:
+//   BACKEND_API_URL
+//   KNOWLEDGEBASE_API_KEY
 
 exports.handler = async function (event) {
   const headers = {
@@ -33,7 +32,6 @@ exports.handler = async function (event) {
     };
   }
 
-  // Forward the includeAll query param if the dashboard passes it
   const includeAll = event.queryStringParameters?.includeAll === 'true';
   const url = `${apiUrl}/api/v1/knowledgebase/export${includeAll ? '?includeAll=true' : ''}`;
 
@@ -51,7 +49,6 @@ exports.handler = async function (event) {
     }
 
     const data = await response.json();
-
     return { statusCode: 200, headers, body: JSON.stringify(data) };
   } catch (err) {
     console.error('backend-data function error:', err);
