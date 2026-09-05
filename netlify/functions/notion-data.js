@@ -1,339 +1,1528 @@
-const NOTION_API_BASE = 'https://api.notion.com/v1';
-const NOTION_VERSION = '2022-06-28';
+<!DOCTYPE html>
+<!--
+===================================================================================
+CONNECTGO KB QUALITY DASHBOARD — DEPLOYMENT NOTES FOR SAM
+===================================================================================
 
-const DATABASES = {
-  Themes: '30a60bfb-014e-8041-a28d-d7477d55e4db',
-  'Sub-themes': '30a60bfb-014e-80fd-bf3d-ca01d7f171b3',
-  Indicators: '30a60bfb-014e-806f-8e3a-db04271bfcdf',
-  Questions: '30a60bfb-014e-8042-a72c-c6c14c2ef065',
+WHAT THIS FILE IS:
+  Self-contained HTML dashboard for the ConnectGo Knowledge Base QA pipeline.
+  Uses React (loaded via CDN) + Babel (transpiles JSX in browser).
+  Currently runs on seed/demo data. Needs a Netlify Function to go live.
+
+WHAT SAM NEEDS TO BUILD:
+  A Netlify serverless function at: netlify/functions/notion-data.js
+  The dashboard calls: GET /.netlify/functions/notion-data
+  It expects a JSON array of items back (schema below).
+
+FOLDER STRUCTURE FOR NETLIFY:
+  /
+  ├── index.html                        ← this file, renamed to index.html
+  └── netlify/
+      └── functions/
+          └── notion-data.js            ← Sam builds this
+
+NETLIFY ENVIRONMENT VARIABLE:
+  NOTION_TOKEN = <ConnectGo Compliance v2 integration token>
+  Set this in Netlify: Site configuration → Environment variables
+  NEVER put the token in code.
+
+NOTION DATABASES TO QUERY (all use ConnectGo Compliance v2 integration):
+  Themes DB:      30a60bfb-014e-80c6-8bfb-000b4f8f6d4b
+  Sub-themes DB:  30a60bfb-014e-8056-95b2-000b7eeff70d
+  Indicators DB:  30a60bfb-014e-8001-b8eb-000bb2d071bf
+  Questions DB:   30a60bfb-014e-8013-b1e2-000b94a07c65
+
+NOTION FIELD NAMES TO EXTRACT PER DB:
+
+  ALL FOUR DBs — QA fields (added June 2026):
+    "Requires Action"          → select field
+    "Action Needed By"         → multi-select field (Belinda / Kate / Hope / Hannah)
+    "Assigned by"              → select field (Kate / Hannah / Belinda / Hope)
+    "Action Deadline"          → date field (ISO string)
+    "Taxonomic Thinking ★"     → select field (extract leading number 1-5)
+    "Completeness ★"           → select field (extract leading number 1-5)
+    "Construct Understanding ★"→ select field (extract leading number 1-5)
+    "Design ★"                 → select field (extract leading number 1-5)
+    "Review Notes"             → rich text field
+
+  THEMES DB specific:
+    Title field = "Theme Name"
+    "Theme Status"             → status field
+    "Vertical"                 → select field
+
+  SUB-THEMES DB specific:
+    Title field = "Sub-theme name"
+    "Subtheme Status"          → status field
+    "Vertical"                 → select field
+    "Theme"                    → relation field (grab first related page ID)
+
+  INDICATORS DB specific:
+    Title field = page title
+    Status field = check schema — may be "Indicator Status"
+    "Vertical"                 → select field
+    "Sub-theme"                → relation field (grab first related page ID)
+
+  QUESTIONS DB specific:
+    Title field = "Question Text"
+    "Question Status"          → status field
+    "Vertical (via Subtheme)"  → rollup field (returns array — grab first value)
+    "Subtheme"                 → relation field (grab first related page ID)
+    "Indicator database"       → relation field (grab first related page ID)
+      NOTE: this is the Questions→Indicators link. Currently one-way.
+      Include the linked indicator page ID as "parentIndicatorId" in the response.
+
+JSON RESPONSE SCHEMA (array of objects):
+  [
+    {
+      "id":              string,   // Notion page URL (unique)
+      "db":              string,   // "Themes" | "Sub-themes" | "Indicators" | "Questions"
+      "name":            string,   // item title
+      "url":             string,   // full Notion page URL
+      "status":          string,   // status field value
+      "vertical":        string,   // "C4C" | "RfC" | "RfN" | null
+      "requiresAction":  string,   // select value or null
+      "actionNeededBy":  string[], // people responsible for the action
+      "assignedBy":      string,   // "Kate" | "Hannah" | "Belinda" | "Hope" | null
+      "deadline":        string,   // ISO date string or null
+      "taxonomic":       number,   // 1-5 or null
+      "completeness":    number,   // 1-5 or null
+      "construct":       number,   // 1-5 or null
+      "design":          number,   // 1-5 or null
+      "notes":           string,   // review notes text or null
+      "themeId":         string,   // related theme page URL or null
+      "subthemeId":      string,   // related sub-theme page URL or null
+      "parentIndicatorId": string  // related indicator page URL or null (questions only)
+    }
+  ]
+
+CORS:
+  The function must return header: Access-Control-Allow-Origin: *
+
+PAGINATION:
+  Notion returns max 100 items per request. Use cursor-based pagination
+  (has_more + next_cursor) to fetch all records from each DB.
+
+CACHING (optional but recommended):
+  Cache the Notion response for 5-10 minutes to avoid rate limits.
+  A simple in-memory cache in the function is fine.
+
+SWITCHING FROM DEMO TO LIVE DATA:
+  The dashboard auto-detects whether the function exists.
+  If /.netlify/functions/notion-data returns 200, it uses live data.
+  If it 404s or errors, it falls back to seed data with "Demo mode" message.
+  No changes needed to this HTML file once the function is deployed.
+
+QUESTIONS:
+  Kate McAlpine — kate@connectgo.co.uk
+===================================================================================
+-->
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ConnectGo — KB Quality Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Rajdhani', sans-serif; }
+select, input, button { font-family: 'Rajdhani', sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+// ─── BRAND COLOURS ───────────────────────────────────────────────────────────
+const C = {
+  forest: "#11302A", plum: "#511433", olive: "#858755",
+  yellow: "#F0C71D", coral: "#EE5C5F", amber: "#CD8028",
+  white: "#FFFFFF", off: "#F5F3EE", cloud: "#EAE6DC",
+  muted: "#5A5040", dim: "#9A9080"
 };
 
-// Retry tuning. 3 retries with exponential backoff (400ms, 800ms, 1600ms)
-// comfortably absorbs a transient Notion 429/5xx without pushing us near the
-// function timeout.
-const MAX_RETRIES = 3;
-const BASE_DELAY_MS = 400;
+// ─── SCOPE CONFIG ─────────────────────────────────────────────────────────────
+const IN_SCOPE_VERTICALS = ['RfC', 'C4C', 'RfN'];
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+// ─── SEED DATA ────────────────────────────────────────────────────────────────
+const SEED_DATA = [
+  // ── REFLECT Sub-themes (Ruvuma review) ──────────────────────────────────────
+  { id: "s1", db: "Sub-themes", name: "Institutional Trust and Legitimacy", themeId: "t1", vertical: "RfC", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-21", taxonomic: 1, construct: 1, design: 1, notes: "Flagged for retirement — all questions have existing KB homes in Social Legitimacy", url: "https://app.notion.com/p/36860bfb014e8118acb4c36e069e0227" },
+  { id: "s2", db: "Sub-themes", name: "Livelihood Security and Resource Rights", themeId: "t6", vertical: "RfC", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-21", taxonomic: 1, construct: 1, design: 1, notes: "Multiple constructs conflated — questions belong in NRM, HWC, User Rights", url: "https://app.notion.com/p/36860bfb014e81178eb4f1fe105f24e5" },
+  { id: "s3", db: "Sub-themes", name: "Benefit Sharing and Conservation Equity", themeId: "t4", vertical: "RfC", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-21", taxonomic: 1, construct: 1, design: 1, notes: "Redundant — all questions have existing KB homes across 3 sub-themes", url: "https://app.notion.com/p/36860bfb014e811fa4f3d9279e7eef9a" },
+  { id: "s4", db: "Sub-themes", name: "Social Cohesion and Conflict Dynamics", themeId: "t1", vertical: "RfC", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-21", taxonomic: 1, completeness: 2, construct: 1, design: 2, notes: "Single question sub-theme — over-built descriptor", url: "https://app.notion.com/p/36860bfb014e81a29e33c62a38a7012d" },
+  { id: "s5", db: "Sub-themes", name: "Community Voice and Participation", themeId: "t1", vertical: "RfC", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-21", taxonomic: 1, construct: 1, design: 1, notes: "7 questions all have existing KB homes", url: "https://app.notion.com/p/36860bfb014e81f0a376c21a25555226" },
+  { id: "s6", db: "Sub-themes", name: "Adoption of Climate Measures and Actions", themeId: "t2", vertical: "RfC", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-21", taxonomic: 4, construct: 4, design: 4, notes: "Provisionally approved. ToC Stage and question scope to verify", url: "https://app.notion.com/p/36860bfb014e812d896fc7f9a25e363a" },
+  { id: "s7", db: "Sub-themes", name: "Climate Change Knowledge and Awareness", themeId: "t2", vertical: "RfC", status: "Approved", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-21", taxonomic: 5, construct: 5, design: 4, notes: "Well-scoped. Check boundary with Emotional/Perceptual sub-theme", url: "https://app.notion.com/p/36860bfb014e81b88e9fe5d71b7b6833" },
+  { id: "s8", db: "Sub-themes", name: "Emotional and Perceptual Responses to Climate Change", themeId: "t2", vertical: "RfC", status: "Approved", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-21", taxonomic: 5, construct: 5, design: 4, notes: "Provisionally approved. Boundary check needed", url: "https://app.notion.com/p/36860bfb014e81d5ac7cf21a26bc53c8" },
+  { id: "s9", db: "Sub-themes", name: "Perceived Social Burdens and Tensions", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/31b60bfb014e80109a82d2a5f0217410" },
+  { id: "s10", db: "Sub-themes", name: "Perceived Fairness of Benefit Distribution", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/31b60bfb014e808d909afeb5ab9bd0be" },
 
-function notionPageUrl(id) {
-  return `https://notion.so/${id.replace(/-/g, '')}`;
-}
+  // ── C4C Indicators (awaiting Kate review) ────────────────────────────────────
+  { id: "i1", db: "Indicators", name: "Proportion of caregivers who report applying at least one programme-learned strategy at home with their child since their last session", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 3, notes: "Strong behaviour transfer construct. Check response option framing — retrospective period needs tightening.", url: "https://app.notion.com/p/33e60bfb014e8171b86cf23b00767ef5" },
+  { id: "i2", db: "Indicators", name: "Proportion of caregivers who report a meaningful increase in confidence in supporting their child's learning, measured on a validated scale at baseline and six months post-enrolment", themeId: "c4c-cl", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 4, notes: "Well-specified. Confirm which validated scale is referenced — needs citation in descriptor.", url: "https://app.notion.com/p/31f60bfb014e804c9a2fc96523b73b60" },
+  { id: "i3", db: "Indicators", name: "Proportion of caregivers who attended at least three structured caregiver learning sessions in the six months prior to the survey", themeId: "c4c-cl", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 5, notes: "Clean output indicator. Three sessions threshold needs programme-level justification in notes.", url: "https://app.notion.com/p/31e60bfb014e8016ab8cd2c19f353ffe" },
+  { id: "i4", db: "Indicators", name: "Proportion of caregivers who report taking at least one action regarding their child's learning informed by school diary content, in the school term prior to the survey", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 4, notes: "Good diary engagement indicator. Ensure 'informed by diary content' is operationally defined for enumerators.", url: "https://app.notion.com/p/32060bfb014e8093a64ecfb13c6dc0f1" },
+  { id: "i5", db: "Indicators", name: "Proportion of caregivers who report high confidence in approaching school staff, asking questions about their child's progress, and raising concerns", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 3, notes: "Three-part construct in one indicator — consider splitting school approach / question asking / raising concerns.", url: "https://app.notion.com/p/33e60bfb014e817aa296c7fb0979c696" },
+  { id: "i6", db: "Indicators", name: "Proportion of caregivers who report at least one self-initiated or school-initiated dialogue with a teacher about their child's learning in the school term prior to the survey", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 4, notes: "Well-scoped. Confirm that 'dialogue' is defined to exclude one-way communication like diary signatures.", url: "https://app.notion.com/p/32060bfb014e8089a731dc9c8d6e6db6" },
+  { id: "i7", db: "Indicators", name: "Rate of teacher diary entries receiving a caregiver signature within one week, across the school term prior to the survey", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Complete Missing Fields", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 2, notes: "Missing: response options, ToC Stage, Vertical tag. Data source field not completed.", url: "https://app.notion.com/p/33e60bfb014e80e5befec429e1809fe2" },
+  { id: "i8", db: "Indicators", name: "Proportion of caregivers who report actively reading and engaging with their child's school diary at least once per week during the school term prior to the survey", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 4, notes: "Core diary engagement indicator. 'Engaging' needs operational definition beyond reading.", url: "https://app.notion.com/p/32060bfb014e802ea2c6c365a4753bcf" },
+  { id: "i9", db: "Indicators", name: "Proportion of caregivers who report their child has access to a designated, adequately lit, and reasonably quiet space for homework or study at home", themeId: "c4c-hc", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 5, notes: "Prerequisite infrastructure indicator. Clean and well-specified.", url: "https://app.notion.com/p/33e60bfb014e81f3bf2fdf4edc194a65" },
+  { id: "i10", db: "Indicators", name: "Proportion of caregivers who report cultural norms or gender-based expectations as preventing or limiting their engagement with school", themeId: "c4c-ei", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 3, notes: "Diagnostic indicator. Sensitive framing needed — check Swahili translation guidance for 'cultural norms'.", url: "https://app.notion.com/p/33e60bfb014e8193b40ef1ec0f726433" },
+  { id: "i11", db: "Indicators", name: "Proportion of caregivers who score at or above the adequacy threshold on a validated brief resilience scale", themeId: "c4c-pw", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 3, design: 4, notes: "Which validated scale? Adequacy threshold not defined in current descriptor. Needs citation.", url: "https://app.notion.com/p/33e60bfb014e817cb2aae30118ff6a44" },
+  { id: "i12", db: "Indicators", name: "Proportion of caregivers who attended at least one programme engagement activity in the reporting year", themeId: "c4c-ce", vertical: "C4C", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/36160bfb014e813b8772ed2344f09cfc" },
 
-// Relation URLs come in inconsistent formats (/p/ vs bare, with/without dashes).
-// Reduce any URL or id to its 32-hex-char core so joins across DBs match reliably.
-function bareId(u) {
-  if (!u) return '';
-  const m = String(u).replace(/-/g, '').match(/[0-9a-f]{32}/i);
-  return m ? m[0].toLowerCase() : String(u);
-}
+  // ── C4C Questions (Belinda to complete) ──────────────────────────────────────
+  { id: "q1", db: "Questions", name: "In the past six months, have you tried any of the learning support strategies you heard about in the programme sessions at home with your child?", themeId: "c4c-ce", vertical: "C4C", status: "In Development", requiresAction: "Complete Missing Fields", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 1, design: 3, notes: "Missing response options entirely. Also needs ToC Stage and sub-theme link.", url: "https://app.notion.com/p/33e60bfb014e8171b86cf23b00767ef5" },
+  { id: "q2", db: "Questions", name: "How confident do you feel in helping your child with their schoolwork and learning at home?", themeId: "c4c-cl", vertical: "C4C", status: "In Development", requiresAction: "Complete Missing Fields", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 2, design: 4, notes: "Response options incomplete — scale defined but anchor labels missing.", url: "https://app.notion.com/p/31f60bfb014e804c9a2fc96523b73b60" },
+  { id: "q3", db: "Questions", name: "How many of the caregiver learning sessions run by the programme have you attended in the past six months?", themeId: "c4c-cl", vertical: "C4C", status: "Draft Complete", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 4, notes: "Good retrospective framing. Confirm response scale — open numeric or banded? Banded preferred for oral admin.", url: "https://app.notion.com/p/31e60bfb014e8016ab8cd2c19f353ffe" },
+  { id: "q4", db: "Questions", name: "In the past school term, did you look at or read your child's school diary at least once a week?", themeId: "c4c-ce", vertical: "C4C", status: "Draft Complete", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 5, notes: "Clean, retrospective, single construct, binary response. No changes needed.", url: "https://app.notion.com/p/32060bfb014e802ea2c6c365a4753bcf" },
+  { id: "q5", db: "Questions", name: "Does your child have a quiet place at home where they can do their homework or study?", themeId: "c4c-hc", vertical: "C4C", status: "Draft Complete", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 5, notes: "Excellent — simple, concrete, binary, easy to translate. Approve.", url: "https://app.notion.com/p/33e60bfb014e81f3bf2fdf4edc194a65" },
+  { id: "q6", db: "Questions", name: "In the past school term, did you speak with a teacher or school staff member about how your child is getting on with their learning?", themeId: "c4c-ce", vertical: "C4C", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 3, design: 2, notes: "Currently uses hypothetical framing ('would you speak'). Rewrite to retrospective ('did you speak'). Also missing Indicator link.", url: "https://app.notion.com/p/32060bfb014e8089a731dc9c8d6e6db6" },
+];
 
-function extractSelect(prop) {
-  return prop?.select?.name ?? null;
-}
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const normVert = v => Array.isArray(v) ? v : (v == null || v === "" ? [] : [v]);
+// Retired records are intentionally excluded everywhere. A record still marked
+// "Retire" remains visible until its Notion status changes to "Retired".
+const isRetired = r => String(r?.status || "").trim().toLowerCase() === "retired";
+const isActionable = r => Boolean(r?.requiresAction);
+const normItems = arr => (Array.isArray(arr) ? arr : [])
+  .map(r => ({ ...r, vertical: normVert(r.vertical), actionNeededBy: normVert(r.actionNeededBy), assignedBy: r.assignedBy || null }))
+  .filter(r => !isRetired(r));
+const parseR = v => { if (v == null) return null; if (typeof v === "number") return v; const m = String(v).match(/^(\d)/); return m ? parseInt(m[1]) : null; };
+const avgR = arr => { const v = arr.map(parseR).filter(x => x !== null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+const todayStr = () => new Date().toISOString().split('T')[0];
+const isOver = d => !!d && d < todayStr();
+const isWeek = d => { if (!d) return false; const t = todayStr(); const e = new Date(); e.setDate(e.getDate() + (7 - e.getDay())); const eStr = e.toISOString().split('T')[0]; return d >= t && d <= eStr; };
+const isDue = d => !!d && (isWeek(d) || isOver(d));
 
-// Vertical is a multi-select on Themes/Sub-themes/Indicators — an item can carry
-// more than one of RfC / C4C / RfN at once. Always returns an array (possibly empty).
-function extractMultiSelect(prop) {
-  return prop?.multi_select?.map(v => v.name) ?? [];
-}
+// ─── PEOPLE ───────────────────────────────────────────────────────────────────
+const PEOPLE = {
+  Belinda: { color: C.olive,   initials: 'BE', role: 'Content developer' },
+  Kate:    { color: C.plum,    initials: 'KA', role: 'Sign-off & approvals' },
+  Both:    { color: C.amber,   initials: 'B+', role: 'Joint action' },
+  Hope:    { color: '#c47b3a', initials: 'HO', role: 'Reviewer' },
+  Hannah:  { color: '#4e7ca8', initials: 'HA', role: 'Reviewer' },
+};
+// Named individuals only (excludes "Both") — used to drive queue cards and batch columns
+const NAMED_OWNERS = ['Belinda', 'Kate', 'Hope', 'Hannah'];
 
-function extractStatus(prop) {
-  return prop?.status?.name ?? null;
-}
+const PILL_STYLES = {
+  "Belinda": { bg: "rgba(133,135,85,0.15)", color: "#505530" },
+  "Kate":    { bg: "rgba(81,20,51,0.15)",   color: "#511433" },
+  "Hope":    { bg: "rgba(196,123,58,0.15)", color: "#7a4000" },
+  "Hannah":  { bg: "rgba(78,124,168,0.15)", color: "#234e72" },
+  "Revise and Resubmit":       { bg: "rgba(238,92,95,0.12)",  color: "#901818" },
+  "Complete Missing Fields":   { bg: "rgba(240,199,29,0.12)", color: "#7A6000" },
+  "Awaiting Sign-off":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
+  "Ready to Publish":          { bg: "rgba(17,48,42,0.08)",   color: C.forest },
+  "Retire":                    { bg: "rgba(238,92,95,0.12)", color: "#901818" },
+  "Discuss with Kate":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
+  "Discuss with Hope":         { bg: "rgba(196,123,58,0.1)",  color: "#7a4000" },
+  "Discuss with Hannah":       { bg: "rgba(78,124,168,0.1)",  color: "#234e72" },
+  "Discuss with Belinda":       { bg: "rgba(78,124,168,0.1)",  color: "#234e72" },
+  "Themes":     { bg: "rgba(81,20,51,0.08)",    color: C.plum },
+  "Sub-themes": { bg: "rgba(205,128,40,0.08)",  color: C.amber },
+  "Indicators": { bg: "rgba(133,135,85,0.1)",   color: C.olive },
+  "Questions":  { bg: "rgba(17,48,42,0.08)",    color: C.forest },
+};
 
-function extractDate(prop) {
-  return prop?.date?.start ?? null;
-}
+const Pill = ({ label, small }) => {
+  const s = PILL_STYLES[label] || { bg: "#eee", color: "#333" };
+  return <span style={{ display: "inline-block", borderRadius: 3, padding: small ? "1px 5px" : "2px 7px", fontSize: small ? 9 : 10, fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap", background: s.bg, color: s.color }}>{label}</span>;
+};
 
-function extractRichText(prop) {
-  return prop?.rich_text?.map(t => t.plain_text).join('') || null;
-}
+const Stars = ({ score, n = 5 }) => {
+  if (score === null) return <span style={{ fontSize: 10, color: C.dim }}>—</span>;
+  return <span style={{ display: "flex", gap: 2, alignItems: "center" }}>
+    {Array.from({ length: n }, (_, i) => {
+      const fill = score >= i + 1 ? C.amber : score > i ? `linear-gradient(90deg,${C.amber} 50%,${C.cloud} 50%)` : C.cloud;
+      return <span key={i} style={{ width: 10, height: 10, borderRadius: 1, background: fill, flexShrink: 0 }} />;
+    })}
+    <span style={{ fontSize: 11, color: C.muted, marginLeft: 5, fontWeight: 600 }}>{score.toFixed ? score.toFixed(1) : score}</span>
+  </span>;
+};
 
-function extractTitle(prop) {
-  return prop?.title?.map(t => t.plain_text).join('') || null;
-}
+const KPI = ({ val, label, sub, accent }) => (
+  <div style={{ background: C.white, borderRadius: 6, padding: "18px 20px", borderLeft: `4px solid ${accent || C.olive}` }}>
+    <div style={{ fontSize: 34, fontWeight: 700, color: accent === C.coral && parseInt(val) > 0 ? C.coral : C.forest, lineHeight: 1 }}>{val}</div>
+    <div style={{ fontSize: 12, color: C.muted, marginTop: 4, fontWeight: 600 }}>{label}</div>
+    {sub && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{sub}</div>}
+  </div>
+);
 
-function extractRelationFirst(prop) {
-  const first = prop?.relation?.[0];
-  return first ? notionPageUrl(first.id) : null;
-}
+const Card = ({ title, sub, children, mb }) => (
+  <div style={{ background: C.white, borderRadius: 6, padding: "20px 22px", marginBottom: mb || 0 }}>
+    {title && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase", marginBottom: 14 }}>{title}</div>}
+    {sub && <div style={{ fontSize: 11, color: C.dim, marginTop: -8, marginBottom: 12 }}>{sub}</div>}
+    {children}
+  </div>
+);
 
-// Select values like "3 - Good" → extract leading digit
-function extractRating(prop) {
-  const name = extractSelect(prop);
-  if (!name) return null;
-  const match = name.match(/^(\d)/);
-  return match ? parseInt(match[1], 10) : null;
-}
+const ActionPill = ({ action }) => {
+  const labels = { "Complete Missing Fields": "Complete Fields", "Revise and Resubmit": "Revise", "Awaiting Sign-off": "Sign-off", "Ready to Publish": "Ready", "Retire": "Retire" };
+  return <Pill label={action} />;
+};
 
-// Formula field — returns string/number/boolean value
-function extractFormula(prop) {
-  const f = prop?.formula;
-  if (!f) return null;
-  if (f.type === 'string') return f.string || null;
-  if (f.type === 'number') return f.number !== null ? String(f.number) : null;
-  if (f.type === 'boolean') return String(f.boolean);
-  return null;
-}
+// ─── PERSON QUEUE CARD ────────────────────────────────────────────────────────
+const PersonQueueCard = ({ person, filtered }) => {
+  const cfg = PEOPLE[person] || { color: C.muted, initials: person.slice(0, 2).toUpperCase(), role: '' };
+  const queue = filtered.filter(r => r.actionNeededBy.includes(person) && isActionable(r));
+  const overdue  = queue.filter(r => isOver(r.deadline)).length;
+  const dueWeek  = queue.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
+  const noDl     = queue.length - overdue - dueWeek;
+  const actionCounts = {};
+  queue.forEach(r => { actionCounts[r.requiresAction] = (actionCounts[r.requiresAction] || 0) + 1; });
+  const topAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  const maxBar = Math.max(overdue, dueWeek, noDl, 1);
 
-// Vertical on Sub-themes ("Verticals ") and Indicators ("Vertical") is a rollup
-// that pulls the parent Theme's multi-select. A rollup of a multi-select comes
-// back as rollup.array, each element itself a multi_select. Flatten to names.
-function extractRollupMultiSelect(prop) {
-  const arr = prop?.rollup?.array;
-  if (!Array.isArray(arr)) return [];
-  const names = [];
-  for (const item of arr) {
-    if (item?.type === 'multi_select' && Array.isArray(item.multi_select)) {
-      names.push(...item.multi_select.map(o => o.name));
-    } else if (item?.type === 'select' && item.select?.name) {
-      names.push(item.select.name);
-    }
-  }
-  return [...new Set(names)];
-}
+  const bar = (count, color, label) => count > 0 && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
+      <div style={{ flex: 1, height: 5, background: C.cloud, borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${Math.round(count / maxBar * 100)}%`, background: color, borderRadius: 3 }} />
+      </div>
+      <span style={{ fontSize: 10, fontWeight: 700, color, minWidth: 80, textAlign: 'right' }}>{count} {label}</span>
+    </div>
+  );
 
-// People field — returns comma-joined display names, or null
-function extractPeopleNames(prop) {
-  const people = prop?.people || [];
-  return people.length ? people.map(p => p.name).join(', ') : null;
-}
-
-// Wraps fetch with retry/backoff for transient failures only.
-//   - Network errors and 429 / 5xx  → retried with exponential backoff
-//     (honouring Retry-After on a 429 when present).
-//   - 400 / 401 / 403 / 404         → returned immediately; retrying a bad
-//     token, database id, or missing integration access never helps, and we
-//     want to fail fast so the real cause surfaces in the error body.
-async function fetchWithRetry(url, options, label) {
-  let lastErr;
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(url, options);
-
-      if (response.ok) return response;
-
-      // Permanent client error — don't retry, let the caller read it.
-      if (response.status !== 429 && response.status < 500) {
-        return response;
+  return (
+    <div style={{ background: C.white, borderRadius: 8, padding: '18px 20px', borderTop: `4px solid ${cfg.color}`, display: 'flex', flexDirection: 'column', gap: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+        <div style={{ width: 42, height: 42, borderRadius: '50%', background: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: C.white, letterSpacing: 1, flexShrink: 0 }}>{cfg.initials}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.forest }}>{person}</div>
+          <div style={{ fontSize: 10, color: C.muted, marginTop: 1, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{cfg.role}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 36, fontWeight: 800, color: queue.length > 0 ? cfg.color : C.dim, lineHeight: 1 }}>{queue.length}</div>
+          <div style={{ fontSize: 9, color: C.dim, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>in queue</div>
+        </div>
+      </div>
+      {queue.length === 0
+        ? <div style={{ fontSize: 12, color: C.olive, fontWeight: 600, paddingTop: 4 }}>Queue clear ✓</div>
+        : <div>
+            {bar(overdue,  C.coral,   'overdue')}
+            {bar(dueWeek,  '#c4a000', 'due this wk')}
+            {bar(noDl,     C.dim,     'no deadline')}
+            {topAction && <div style={{ fontSize: 10, color: C.dim, marginTop: 8 }}>Top task: <span style={{ fontWeight: 700, color: C.muted }}>{topAction}</span></div>}
+          </div>
       }
+    </div>
+  );
+};
 
-      // Transient (429 / 5xx).
-      lastErr = new Error(`${label} ${response.status}`);
-      if (attempt >= MAX_RETRIES) return response;
+// ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
+// ─── DISCREPANCY ENGINE ───────────────────────────────────────────────────────
+function normName(s) { return (s || '').toLowerCase().trim().replace(/\s+/g, ' '); }
 
-      const retryAfter = Number(response.headers.get('retry-after'));
-      const wait = Number.isFinite(retryAfter) && retryAfter > 0
-        ? retryAfter * 1000
-        : BASE_DELAY_MS * 2 ** attempt;
-      await sleep(wait);
-    } catch (err) {
-      // Network-level failure (DNS, socket, abort) — retry.
-      lastErr = err;
-      if (attempt >= MAX_RETRIES) throw lastErr;
-      await sleep(BASE_DELAY_MS * 2 ** attempt);
-    }
-  }
-
-  throw lastErr;
-}
-
-async function queryDatabase(databaseId, token) {
-  const results = [];
-  let cursor = undefined;
-
-  do {
-    const body = cursor ? JSON.stringify({ start_cursor: cursor }) : '{}';
-    const response = await fetchWithRetry(
-      `${NOTION_API_BASE}/databases/${databaseId}/query`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Notion-Version': NOTION_VERSION,
-          'Content-Type': 'application/json',
-        },
-        body,
-      },
-      `Notion API (DB ${databaseId})`,
-    );
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Notion API ${response.status} on DB ${databaseId}: ${text}`);
-    }
-
-    const data = await response.json();
-    results.push(...data.results);
-    cursor = data.has_more ? data.next_cursor : null;
-  } while (cursor);
-
-  return results;
-}
-
-function commonQaFields(props) {
+function computeDiscrepancies(notionData, platformData) {
+  if (!platformData || !notionData) return { themes: [], subthemes: [], indicators: [], questions: [] };
+  // Themes/Sub-themes/Indicators have a direct Vertical select; questions only get it via a rollup that often returns null.
+  // For structured items: require an in-scope vertical. For questions: keep all in scope until the rollup is fixed.
+  const inScope  = r => Array.isArray(r.vertical) && r.vertical.some(v => IN_SCOPE_VERTICALS.includes(v));
+  const inScopeQ = r => true; // Questions rollup unfixed → keep all in scope; change to the inScope form once fixed
+  const backendThemes     = new Set(platformData.themes.map(t => normName(t.name)));
+  const backendSubthemes  = new Set(platformData.themes.flatMap(t => (t.subthemes || []).map(s => normName(s.name))));
+  const backendIndicators = new Set(platformData.themes.flatMap(t => (t.subthemes || []).flatMap(s => (s.indicators || []).map(i => normName(i.name)))));
+  const backendQuestions  = new Set(platformData.themes.flatMap(t => (t.subthemes || []).flatMap(s => (s.questions || []).map(q => normName(q.text)))));
   return {
-    requiresAction: extractSelect(props['Requires Action']),
-    actionNeededBy: extractMultiSelect(props['Action Needed By']),
-    assignedBy: extractSelect(props['Assigned by']),
-    deadline: extractDate(props['Action Deadline']),
-    taxonomic: extractRating(props['Taxonomic Thinking ★']),
-    completeness: extractRating(props['Completeness ★']),
-    construct: extractRating(props['Construct Understanding ★']),
-    design: extractRating(props['Design ★']),
-    notes: extractRichText(props['Review Notes']),
+    themes:     notionData.filter(r => r.db === 'Themes'     && inScope(r)  && !backendThemes.has(normName(r.name))),
+    subthemes:  notionData.filter(r => r.db === 'Sub-themes' && inScope(r)  && !backendSubthemes.has(normName(r.name))),
+    indicators: notionData.filter(r => r.db === 'Indicators' && inScope(r)  && !backendIndicators.has(normName(r.name))),
+    questions:  notionData.filter(r => r.db === 'Questions'  && inScopeQ(r) && !backendQuestions.has(normName(r.name))),
   };
 }
 
-function mapPage(page, dbName) {
-  const props = page.properties;
-  const id = notionPageUrl(page.id);
-  const url = page.url || id;
-
-  if (dbName === 'Themes') {
-    return {
-      id, db: 'Themes', url,
-      name: extractTitle(props['Theme Name']),
-      status: extractStatus(props['Theme Status']),
-      vertical: extractMultiSelect(props['Vertical']),
-      approvedBy: null,
-      developedBy: null,
-      ...commonQaFields(props),
-      themeId: null,
-      subthemeId: null,
-      parentIndicatorId: null,
-    };
-  }
-
-  if (dbName === 'Sub-themes') {
-    return {
-      id, db: 'Sub-themes', url,
-      name: extractTitle(props['Sub-theme name']),
-      status: extractStatus(props['Subtheme Status']),
-      // Rollup returns <omitted /> via the API — resolved from the linked Theme in post-pass.
-      vertical: [],
-      approvedBy: extractPeopleNames(props['Approved By']),
-      developedBy: null,
-      ...commonQaFields(props),
-      themeId: extractRelationFirst(props['Theme database']),
-      subthemeId: null,
-      parentIndicatorId: null,
-    };
-  }
-
-  if (dbName === 'Indicators') {
-    return {
-      id, db: 'Indicators', url,
-      name: extractTitle(props['Indicator statement']),
-      status: extractStatus(props['Status']),
-      // Rollup returns <omitted /> — resolved from the linked Subtheme in post-pass.
-      vertical: [],
-      approvedBy: null,
-      developedBy: extractPeopleNames(props['Developed By']),
-      ...commonQaFields(props),
-      themeId: null,
-      subthemeId: extractRelationFirst(props['Subtheme']),
-      parentIndicatorId: null,
-    };
-  }
-
-  if (dbName === 'Questions') {
-    // Vertical is not stored on the question — Notion can't roll it up from the
-    // subtheme (rollup-of-a-rollup is disallowed). Left empty here and filled from
-    // the linked subtheme's verticals in a post-pass after all DBs are mapped.
-    return {
-      id, db: 'Questions', url,
-      name: extractTitle(props['Question Text']),
-      // Question Status is a select (not a status widget) — use extractSelect
-      status: extractSelect(props['Question Status']),
-      vertical: [],
-      approvedBy: null,
-      developedBy: null,
-      ...commonQaFields(props),
-      themeId: null,
-      subthemeId: extractRelationFirst(props['Subtheme']),
-      parentIndicatorId: extractRelationFirst(props['Indicator database']),
-    };
-  }
-
-  return null;
-}
-
-exports.handler = async function (event) {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Content-Type': 'application/json',
-    // Never let the browser or Netlify's CDN serve a stale copy — always
-    // reflect the current state of Notion.
-    'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-    'Netlify-CDN-Cache-Control': 'no-store',
-  };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers };
-  }
-
-  const token = process.env.NOTION_TOKEN;
-  if (!token) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: 'NOTION_TOKEN environment variable is not set' }),
-    };
-  }
-
-  try {
-    // The four databases are independent, so fetch them concurrently rather
-    // than one-after-another. This roughly quarters the wall-clock time and is
-    // the main defence against tripping the function timeout (which was the
-    // cause of the intermittent "Demo mode" fallback).
-    const dbEntries = Object.entries(DATABASES);
-    const pagesPerDb = await Promise.all(
-      dbEntries.map(([, dbId]) => queryDatabase(dbId, token)),
-    );
-
-    // Map in the original DB order (Themes → Sub-themes → Indicators → Questions)
-    // so output ordering stays stable.
-    const allItems = [];
-    dbEntries.forEach(([dbName], i) => {
-      for (const page of pagesPerDb[i]) {
-        const mapped = mapPage(page, dbName);
-        if (mapped) allItems.push(mapped);
-      }
-    });
-
-    // Verticals live only on Themes (a reliable multi-select). Everything below
-    // derives by walking relations, because the rollups return <omitted /> via the
-    // API and the direct Indicator→Theme relation points at inaccessible pages.
-    // Chain: Theme.vertical → Sub-theme (via Theme database) → Indicator/Question (via Subtheme).
-    // All lookups are keyed on bareId() so mismatched URL formats still join.
-    const themeVert = {};      // bareId(theme)    → verticals[]
-    const subVert = {};        // bareId(subtheme) → verticals[]
-
-    for (const item of allItems) {
-      if (item.db === 'Themes') themeVert[bareId(item.id)] = item.vertical || [];
-    }
-    for (const item of allItems) {
-      if (item.db === 'Sub-themes') {
-        item.vertical = themeVert[bareId(item.themeId)] || [];
-        subVert[bareId(item.id)] = item.vertical;
-      }
-    }
-    for (const item of allItems) {
-      if (item.db === 'Indicators' || item.db === 'Questions') {
-        item.vertical = subVert[bareId(item.subthemeId)] || [];
-      }
-    }
-
-    return { statusCode: 200, headers, body: JSON.stringify(allItems) };
-  } catch (err) {
-    console.error('notion-data function error:', err);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: err.message }),
-    };
-  }
+// ─── ACTION BREAKDOWN (expandable) ───────────────────────────────────────────
+const ACTION_COLORS = {
+  'Complete Missing Fields': '#F0C71D',
+  'Revise and Resubmit':     C.coral,
+  'Awaiting Sign-off':       C.plum,
+  'Ready to Publish':        C.forest,
+  'Retire':                  C.coral,
 };
+const actionColor = k => {
+  if (ACTION_COLORS[k]) return ACTION_COLORS[k];
+  if (k && k.startsWith('Discuss with')) return (PEOPLE[k.replace('Discuss with ', '')] || {}).color || C.muted;
+  return C.muted;
+};
+
+const PAGE = 10;
+
+const ActionBreakdown = ({ filtered, total }) => {
+  const [expanded, setExpanded] = useState({});
+  const [shown, setShown] = useState({});
+
+  const aC = {};
+  filtered.forEach(r => { if (isActionable(r)) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+
+  const toggle = k => setExpanded(e => ({ ...e, [k]: !e[k] }));
+  const showMore = (e, k, items) => {
+    e.stopPropagation();
+    setShown(s => ({ ...s, [k]: Math.min((s[k] || PAGE) + PAGE, items.length) }));
+  };
+
+  return (
+    <Card title="Action Breakdown">
+      <div style={{ maxHeight: 520, overflowY: 'auto', overflowX: 'hidden' }}>
+      {Object.entries(aC).sort((a, b) => b[1] - a[1]).map(([k, v]) => {
+        const color   = actionColor(k);
+        const isOpen  = !!expanded[k];
+        const items   = filtered.filter(r => r.requiresAction === k);
+        const limit   = shown[k] || PAGE;
+        const visible = items.slice(0, limit);
+        const hasMore = items.length > limit;
+        const pct     = total > 0 ? Math.round(v / total * 100) : 0;
+
+        return (
+          <div key={k} style={{ marginBottom: isOpen ? 14 : 8 }}>
+            {/* Clickable header row */}
+            <div onClick={() => toggle(k)} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', marginBottom: 5 }}>
+              <span style={{ fontSize: 8, color, transition: 'transform 0.15s', display: 'inline-block', transform: isOpen ? 'rotate(90deg)' : 'none', flexShrink: 0 }}>▶</span>
+              <span style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>{k}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: color + '22', color }}>{v}</span>
+            </div>
+            {/* Progress bar */}
+            <div style={{ height: 4, background: C.cloud, borderRadius: 2, overflow: 'hidden', marginLeft: 16, marginBottom: isOpen ? 8 : 0 }}>
+              <div style={{ height: '100%', borderRadius: 2, background: color, width: `${pct}%` }} />
+            </div>
+            {/* Expanded item list */}
+            {isOpen && (
+              <div style={{ marginLeft: 16, background: C.off, borderRadius: 6, border: `1px solid ${C.cloud}`, maxHeight: 320, overflowY: 'auto', overflowX: 'hidden' }}>
+                {visible.map((r, i) => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '7px 10px', borderBottom: i < visible.length - 1 ? `1px solid ${C.cloud}` : 'none', minWidth: 0 }}>
+                    <span style={{ fontSize: 10, color: C.dim, width: 18, fontWeight: 600, flexShrink: 0 }}>{i + 1}</span>
+                    <Pill label={r.db} small />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.forest, fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>{r.name}</span>
+                    {r.vertical.length > 0 && <span style={{ fontSize: 10, color: C.dim, flexShrink: 0 }}>{r.vertical.join(', ')}</span>}
+                    {r.deadline && <span style={{ fontSize: 10, color: isOver(r.deadline) ? C.coral : C.dim, fontWeight: isOver(r.deadline) ? 700 : 400, flexShrink: 0, whiteSpace: 'nowrap' }}>{isOver(r.deadline) ? '⚠ ' : ''}{r.deadline}</span>}
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.amber, textDecoration: 'none', fontWeight: 700, flexShrink: 0 }}>↗</a>
+                  </div>
+                ))}
+                {hasMore && (
+                  <div style={{ padding: '7px 10px', borderTop: `1px solid ${C.cloud}`, textAlign: 'center' }}>
+                    <button onClick={e => showMore(e, k, items)} style={{ fontSize: 11, fontWeight: 700, color: C.amber, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      Show next {Math.min(PAGE, items.length - limit)} · {items.length - limit} remaining ↓
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      </div>
+    </Card>
+  );
+};
+
+const Overview = ({ filtered, discrepancies, allData }) => {
+  const total = filtered.length;
+  const needs = filtered.filter(isActionable).length;
+  const over  = filtered.filter(r => isOver(r.deadline)).length;
+  const wk    = filtered.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
+  const aC = {};
+  filtered.forEach(r => { if (isActionable(r)) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+
+  const dims = ["taxonomic", "completeness", "construct", "design"];
+  const dL   = ["Taxonomic Thinking", "Completeness", "Construct Understanding", "Design"];
+
+  // Fixed pipeline stages
+  const FIXED_STAGES = [
+    { key: 'Complete Missing Fields', color: '#F0C71D', owner: 'Belinda' },
+    { key: 'Revise and Resubmit',     color: C.coral,   owner: 'Belinda' },
+    { key: 'Awaiting Sign-off',       color: C.plum,    owner: 'Kate' },
+    { key: 'Ready to Publish',        color: C.forest,  owner: null },
+    { key: 'Retire',                  color: C.coral,   owner: null },
+  ];
+  // Dynamic discuss stages derived from live data
+  const discussStages = [...new Set(
+    filtered.map(r => r.requiresAction).filter(v => v && v.startsWith('Discuss with'))
+  )].sort().map(key => {
+    const who = key.replace('Discuss with ', '');
+    return { key, color: (PEOPLE[who] || {}).color || C.muted, owner: who, isDiscuss: true };
+  });
+
+  return <div>
+    {/* Top stats row */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 16 }}>
+      <KPI val={total} label="In scope"    accent={C.forest} />
+      <KPI val={needs} label="Needs action" accent={C.amber} />
+      <KPI val={over}  label="Overdue"     accent={C.coral} />
+      <KPI val={wk}    label="Due this week" accent="#F0C71D" />
+    </div>
+
+    {/* Per-person queue cards */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12, marginBottom: 16 }}>
+      {NAMED_OWNERS.map(person => <PersonQueueCard key={person} person={person} filtered={filtered} />)}
+    </div>
+
+    {/* Pipeline + Quality */}
+    <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
+      <Card title="Action Pipeline">
+        {/* Fixed stages */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(105px,1fr))", gap: 3, marginBottom: discussStages.length > 0 ? 10 : 0 }}>
+          {FIXED_STAGES.map(({ key, color, owner }) => (
+            <div key={key} style={{ padding: "12px 14px", borderRadius: 6, background: color + "18", border: `1px solid ${color}44` }}>
+              <div style={{ fontSize: 26, fontWeight: 800, color }}>{aC[key] || 0}</div>
+              <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginTop: 4, lineHeight: 1.3 }}>{key}</div>
+              {owner && <div style={{ fontSize: 9, color: C.dim, marginTop: 2 }}>→ {owner}</div>}
+            </div>
+          ))}
+        </div>
+        {/* Discussion stages — shown only when present in data */}
+        {discussStages.length > 0 && (
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: C.dim, textTransform: 'uppercase', marginBottom: 6 }}>Discussions</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(140px,1fr))", gap: 3 }}>
+              {discussStages.map(({ key, color, owner }) => (
+                <div key={key} style={{ padding: "12px 14px", borderRadius: 6, background: color + "12", border: `1px dashed ${color}55`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 26, fontWeight: 800, color }}>{aC[key] || 0}</div>
+                    <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginTop: 2 }}>Discuss with {owner}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+      <Card title="Avg Quality Scores" sub="Nulls excluded">
+        {dims.map((d, i) => {
+          const s = avgR(filtered.map(r => r[d]));
+          const n = filtered.filter(r => parseR(r[d]) !== null).length;
+          return <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${C.cloud}` : "none" }}>
+            <span style={{ fontSize: 12, fontWeight: 500 }}>{dL[i]}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <Stars score={s} />
+              <span style={{ fontSize: 10, color: C.dim }}>({n})</span>
+            </span>
+          </div>;
+        })}
+      </Card>
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <Card title={<>Deadlines <span style={{ display: "inline-block", padding: "2px 7px", borderRadius: 3, fontSize: 10, fontWeight: 700, background: "#F0C71D", color: C.forest, marginLeft: 8 }}>this week + overdue</span></>}>
+        {(() => {
+          const dueItems = filtered.filter(r => isDue(r.deadline)).sort((a, b) => isOver(a.deadline) !== isOver(b.deadline) ? (isOver(a.deadline) ? -1 : 1) : (a.deadline > b.deadline ? 1 : -1));
+          return dueItems.length
+            ? <div style={{ maxHeight: 340, overflowY: "auto" }}>{dueItems.map(r => (
+              <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${C.cloud}` }}>
+                <Pill label={r.db} small />{r.actionNeededBy.map(a => <Pill key={a} label={a} small />)}
+                {isOver(r.deadline) && <span style={{ fontSize: 9, fontWeight: 800, background: C.coral + "22", color: C.coral, padding: "2px 5px", borderRadius: 2, whiteSpace: "nowrap" }}>OVERDUE</span>}
+                <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{r.name}</span>
+                <span style={{ fontSize: 11, color: isOver(r.deadline) ? C.coral : C.dim, whiteSpace: "nowrap" }}>{r.deadline}</span>
+              </div>))}</div>
+            : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>No upcoming or overdue deadlines</div>;
+        })()}
+      </Card>
+      <ActionBreakdown filtered={filtered} total={total} />
+    </div>
+    {discrepancies && allData && (() => {
+      const inScopeOv  = r => Array.isArray(r.vertical) && r.vertical.some(v => IN_SCOPE_VERTICALS.includes(v));
+      const inScopeOvQ = r => true;
+      const totals = { Themes: allData.filter(r => r.db === 'Themes' && inScopeOv(r)).length, 'Sub-themes': allData.filter(r => r.db === 'Sub-themes' && inScopeOv(r)).length, Indicators: allData.filter(r => r.db === 'Indicators' && inScopeOv(r)).length, Questions: allData.filter(r => r.db === 'Questions' && inScopeOvQ(r)).length };
+      const missing = { Themes: discrepancies.themes.length, 'Sub-themes': discrepancies.subthemes.length, Indicators: discrepancies.indicators.length, Questions: discrepancies.questions.length };
+      const totalMissing = missing.Themes + missing['Sub-themes'] + missing.Indicators + missing.Questions;
+      return (
+        <div style={{ marginTop: 16 }}>
+          <Card title={<>Platform Sync <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 3, background: totalMissing > 0 ? C.coral + "22" : C.olive + "22", color: totalMissing > 0 ? C.coral : C.olive, marginLeft: 8 }}>{totalMissing > 0 ? `${totalMissing} missing` : "All synced"}</span></>} sub="Notion → Backend transfer status">
+            {['Themes', 'Sub-themes', 'Indicators', 'Questions'].map(db => {
+              const total = totals[db] || 0;
+              const synced = total - (missing[db] || 0);
+              const pct = total > 0 ? Math.round(synced / total * 100) : 100;
+              const color = pct === 100 ? C.olive : pct >= 75 ? C.amber : C.coral;
+              return (
+                <div key={db} style={{ marginBottom: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>
+                    <span>{db}</span>
+                    <span style={{ color: C.dim }}>{synced} / {total} <span style={{ color, fontWeight: 700 }}>({pct}%)</span></span>
+                  </div>
+                  <div style={{ height: 6, background: C.cloud, borderRadius: 3, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3, transition: "width 0.4s" }} />
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+        </div>
+      );
+    })()}
+  </div>;
+};
+
+// ─── TODAY TAB ────────────────────────────────────────────────────────────────
+const Today = ({ filtered, batchSize }) => {
+  const buildBatch = (owner) => filtered
+    .filter(r => r.actionNeededBy.includes(owner) && isActionable(r))
+    .sort((a, b) => {
+      // Overdue first, then soonest/most-recent deadline, then undated last.
+      if (isOver(a.deadline) !== isOver(b.deadline)) return isOver(a.deadline) ? -1 : 1;
+      if (a.deadline && b.deadline) return a.deadline < b.deadline ? -1 : 1;
+      return a.deadline ? -1 : b.deadline ? 1 : 0;
+    })
+    .slice(0, batchSize);
+
+  // Always show each named person's batch, including Hannah when her queue is empty.
+  const activeOwners = NAMED_OWNERS;
+
+  const BatchItem = ({ r, i, owner }) => {
+    const cfg = PEOPLE[owner] || { color: C.muted };
+    return (
+      <div style={{ background: C.off, borderRadius: 6, padding: "14px 16px", marginBottom: 8, borderLeft: `3px solid ${cfg.color}`, display: "flex", alignItems: "flex-start", gap: 14 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.dim, minWidth: 24, paddingTop: 2 }}>{i + 1}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.forest, lineHeight: 1.4, wordBreak: 'break-word' }}>{r.name}</div>
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <Pill label={r.db} small />
+            <Pill label={r.requiresAction} small />
+            {(r.vertical || []).map(v => <Pill key={v} label={v} small />)}
+            {r.deadline && <span style={{ color: isOver(r.deadline) ? C.coral : C.dim, fontWeight: isOver(r.deadline) ? 700 : 400 }}>{isOver(r.deadline) ? '⚠ ' : ''}{r.deadline}</span>}
+          </div>
+          {r.assignedBy && <div style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>Assigned by: <span style={{ fontWeight: 600 }}>{r.assignedBy}</span></div>}
+          {r.developedBy && <div style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>Developed by: <span style={{ fontWeight: 600 }}>{r.developedBy}</span></div>}
+          {r.approvedBy  && <div style={{ fontSize: 10, color: C.dim, marginTop: 1 }}>Approved by: <span style={{ fontWeight: 600 }}>{r.approvedBy}</span></div>}
+          {r.notes && <div style={{ fontSize: 11, color: C.muted, marginTop: 4, fontStyle: "italic" }}>{r.notes.slice(0, 120)}{r.notes.length > 120 ? "…" : ""}</div>}
+        </div>
+        <a href={r.url} target="_blank" rel="noreferrer" style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 3, fontSize: 11, fontWeight: 700, background: C.forest, color: C.white, textDecoration: "none", marginTop: 2 }}>Open in Notion ↗</a>
+      </div>
+    );
+  };
+
+  if (activeOwners.length === 0) {
+    return <div style={{ textAlign: "center", padding: 60, color: C.dim, fontStyle: "italic" }}>No active queues — all items are clear or unassigned</div>;
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(activeOwners.length, 2)}, 1fr)`, gap: 16 }}>
+      {activeOwners.map(owner => {
+        const cfg = PEOPLE[owner] || { color: C.muted };
+        const batch = buildBatch(owner);
+        const qTotal = filtered.filter(r => r.actionNeededBy.includes(owner) && isActionable(r)).length;
+        return (
+          <Card key={owner} title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 22, height: 22, borderRadius: '50%', background: cfg.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, color: C.white }}>{(PEOPLE[owner] || {}).initials || owner.slice(0,2)}</div>
+              <span>{owner}'s Batch</span>
+              <span style={{ fontSize: 10, fontWeight: 400, color: C.dim, marginLeft: 2 }}>{batch.length} of {qTotal} in queue</span>
+            </div>
+          }>
+            {batch.length
+              ? batch.map((r, i) => <BatchItem key={r.id} r={r} i={i} owner={owner} />)
+              : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>Queue clear 🎉</div>
+            }
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+// ─── PIPELINE TAB ─────────────────────────────────────────────────────────────
+const Pipeline = ({ filtered }) => {
+  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Sign-off", "Ready to Publish", "Retire"];
+  const discussStages = [...new Set(filtered.map(r => r.requiresAction).filter(v => v && v.startsWith('Discuss with')))].sort();
+  const allStages     = [...FIXED_STAGES, ...discussStages];
+
+  const tdStyle = { padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 12 };
+
+  return <div>{allStages.map(s => {
+    const items = filtered.filter(r => r.requiresAction === s);
+    if (!items.length) return null;
+    const isDiscuss = s.startsWith('Discuss with');
+    const stageColor = actionColor(s);
+
+    // Decide which attribution columns to show for this stage's items
+    const showAssignedBy = items.some(r => r.assignedBy);
+    const showDeveloped  = items.some(r => r.developedBy);
+    const showApproved   = items.some(r => r.approvedBy);
+
+    return <div key={s} style={{ background: C.white, borderRadius: 6, padding: "20px 22px", marginBottom: 16, borderLeft: isDiscuss ? `4px dashed ${stageColor}55` : 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        {isDiscuss && <span style={{ fontSize: 14 }}>💬</span>}
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase" }}>{s}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: stageColor }}>{items.length}</span>
+      </div>
+      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 380 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <thead><tr>
+            {["Item", "DB", "Action Needed By", ...(showAssignedBy ? ["Assigned by"] : []), "Vertical", "Deadline",
+              ...(showDeveloped ? ["Developed By"] : []),
+              ...(showApproved  ? ["Approved By"]  : []),
+              "Link"
+            ].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap', position: 'sticky', top: 0, background: C.white, zIndex: 1 }}>{h}</th>)}
+          </tr></thead>
+          <tbody>{items.map(r => <tr key={r.id}>
+            <td style={{ ...tdStyle, fontWeight: 600, maxWidth: 320 }}>{r.name}</td>
+            <td style={tdStyle}><Pill label={r.db} small /></td>
+            <td style={tdStyle}>{r.actionNeededBy.length ? r.actionNeededBy.map(a => <Pill key={a} label={a} small />) : '—'}</td>
+            {showAssignedBy && <td style={{ ...tdStyle, fontSize: 11, color: C.muted }}>{r.assignedBy || "—"}</td>}
+            <td style={{ ...tdStyle, fontSize: 11 }}>{r.vertical.length ? r.vertical.join(', ') : "—"}</td>
+            <td style={{ ...tdStyle, color: isOver(r.deadline) ? C.coral : "inherit", fontWeight: isOver(r.deadline) ? 700 : 400, whiteSpace: 'nowrap' }}>{r.deadline || "—"}</td>
+            {showDeveloped && <td style={{ ...tdStyle, fontSize: 11, color: C.muted }}>{r.developedBy || "—"}</td>}
+            {showApproved  && <td style={{ ...tdStyle, fontSize: 11, color: C.muted }}>{r.approvedBy  || "—"}</td>}
+            <td style={tdStyle}><a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.amber, textDecoration: 'none', fontWeight: 600 }}>↗</a></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </div>;
+  })}</div>;
+};
+
+// ─── QUALITY TAB ─────────────────────────────────────────────────────────────
+const Quality = ({ filtered }) => {
+  const dims = ["taxonomic", "completeness", "construct", "design"];
+  const dL = ["Taxonomic Thinking", "Completeness", "Construct Understanding", "Design"];
+  const rated = filtered.filter(r => dims.some(d => parseR(r[d]) !== null));
+  return <div>
+    <Card title="Quality Scores by Item" sub="Nulls excluded · applicable dimensions only · click name to open in Notion" mb={16}>
+      {rated.length
+        ? <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 460 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead><tr>
+                {["Item", "DB", "Vertical", "Overall", ...dL, "Developed By", "Approved By"].map(h => <th key={h} style={{ textAlign: "left", padding: "8px 12px", borderBottom: `2px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", color: C.dim, textTransform: "uppercase", whiteSpace: 'nowrap', position: 'sticky', top: 0, background: C.white, zIndex: 1 }}>{h}</th>)}
+              </tr></thead>
+              <tbody>{rated.map(r => {
+                const vals = dims.map(d => parseR(r[d])).filter(v => v !== null);
+                const ov = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+                return <tr key={r.id}>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontWeight: 600, maxWidth: 260 }}>
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ color: C.forest, textDecoration: "none" }}>{r.name}</a>
+                  </td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}><Pill label={r.db} small /></td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11 }}>{r.vertical.length ? r.vertical.join(', ') : "—"}</td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}>{ov !== null ? <Stars score={ov} /> : "—"}</td>
+                  {dims.map(d => <td key={d} style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}` }}>{parseR(r[d]) !== null ? <Stars score={parseR(r[d])} /> : <span style={{ fontSize: 10, color: C.dim }}>—</span>}</td>)}
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>{r.developedBy || "—"}</td>
+                  <td style={{ padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 11, color: C.muted, whiteSpace: 'nowrap' }}>{r.approvedBy  || "—"}</td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+        : <div style={{ textAlign: "center", padding: 24, color: C.dim, fontStyle: "italic" }}>No rated items yet — populate ratings in Notion</div>}
+    </Card>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <Card title="Average by Dimension">
+        {dims.map((d, i) => {
+          const s = avgR(filtered.map(r => r[d]));
+          const n = filtered.filter(r => parseR(r[d]) !== null).length;
+          return <div key={d} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? `1px solid ${C.cloud}` : "none" }}>
+            <span style={{ fontSize: 12, fontWeight: 500 }}>{dL[i]}</span>
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Stars score={s} /><span style={{ fontSize: 10, color: C.dim }}>({n})</span></span>
+          </div>;
+        })}
+      </Card>
+      <Card title="Score Distribution">
+        {(() => {
+          const bkts = [0, 0, 0, 0, 0];
+          filtered.forEach(r => dims.forEach(d => { const v = parseR(r[d]); if (v !== null) bkts[v - 1]++; }));
+          const max = Math.max(...bkts, 1);
+          const colors = [C.coral, C.amber, "#F0C71D", C.olive, C.forest];
+          return <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 120, paddingTop: 16 }}>
+            {bkts.map((v, i) => <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.muted }}>{v || ""}</span>
+              <div style={{ width: "100%", height: Math.round(v / max * 80) + "px", background: colors[i], borderRadius: "3px 3px 0 0", minHeight: v > 0 ? 4 : 0 }} />
+              <span style={{ fontSize: 11, color: C.dim }}>{i + 1}</span>
+            </div>)}
+          </div>;
+        })()}
+      </Card>
+    </div>
+  </div>;
+};
+
+// ─── HIERARCHY TAB ────────────────────────────────────────────────────────────
+// Sub-theme row — expandable, shows indicators + questions inside
+const HierarchySub = ({ sub, indicators, questions }) => {
+  const [open, setOpen] = useState(false);
+  const hasAction = isActionable(sub);
+
+  return (
+    <div style={{ borderRadius: 4, marginBottom: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', borderLeft: hasAction ? '2px solid rgba(238,92,95,0.6)' : 'none' }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+        <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>▶</span>
+        <span style={{ fontSize: 12, fontWeight: 600, flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.85)', wordBreak: 'break-word', lineHeight: 1.35 }}>{sub.name}</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>{indicators.length}i · {questions.length}q</span>
+        {hasAction
+          ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 2, background: 'rgba(238,92,95,0.25)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>⚠ {sub.requiresAction}</span>
+          : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 2, background: 'rgba(133,135,85,0.2)', color: '#c8d89a', flexShrink: 0 }}>✓</span>}
+        {sub.actionNeededBy.length > 0 && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 2, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)', flexShrink: 0 }}>{sub.actionNeededBy.join(', ')}</span>}
+        <a href={sub.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+      </div>
+      {open && (
+        <div style={{ padding: '6px 12px 10px 28px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Meta row */}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            {sub.status    && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Status: {sub.status}</span>}
+            {sub.vertical.length > 0 && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Vertical: {sub.vertical.join(', ')}</span>}
+            {sub.taxonomic   != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Tax: {sub.taxonomic}/5</span>}
+            {sub.completeness!= null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Complete: {sub.completeness}/5</span>}
+            {sub.construct   != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Construct: {sub.construct}/5</span>}
+            {sub.design      != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Design: {sub.design}/5</span>}
+            {sub.approvedBy  && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Approved by: {sub.approvedBy}</span>}
+            {sub.assignedBy  && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Assigned by: {sub.assignedBy}</span>}
+          </div>
+          {sub.notes && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 10 }}>{sub.notes}</div>}
+          {/* Indicators */}
+          {indicators.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 4 }}>Indicators ({indicators.length})</div>
+              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                {indicators.map(ind => (
+                  <div key={ind.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, lineHeight: 1.4, wordBreak: 'break-word' }}>{ind.name}</span>
+                    {isActionable(ind) && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{ind.requiresAction}</span>}
+                    {ind.developedBy && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{ind.developedBy}</span>}
+                    <a href={ind.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {/* Questions */}
+          {questions.length > 0 && (
+            <div>
+              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', marginBottom: 4 }}>Questions ({questions.length})</div>
+              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                {questions.map(q => (
+                  <div key={q.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, lineHeight: 1.4, wordBreak: 'break-word' }}>{q.name}</span>
+                    {isActionable(q) && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{q.requiresAction}</span>}
+                    <a href={q.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {indicators.length === 0 && questions.length === 0 && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', fontStyle: 'italic' }}>No indicators or questions linked in current filter</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Theme row — expandable, contains sub-themes
+const HierarchyTheme = ({ theme, subthemes, indsBySubtheme, qsBySubtheme }) => {
+  const [open, setOpen] = useState(false);
+  const actionCount = subthemes.filter(isActionable).length;
+  const indTotal = subthemes.reduce((n, s) => n + (indsBySubtheme.get(s.id) || []).length, 0);
+  const qTotal   = subthemes.reduce((n, s) => n + (qsBySubtheme.get(s.id)   || []).length, 0);
+
+  return (
+    <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, overflow: 'hidden', color: C.white }}>
+      <div onClick={() => setOpen(o => !o)} style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+        <span style={{ fontSize: 9, transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>▶</span>
+        <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{theme.name}</span>
+        {theme.vertical.length > 0 && <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 2, background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>{theme.vertical.join(', ')}</span>}
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>{subthemes.length} sub · {indTotal}i · {qTotal}q</span>
+        {actionCount > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 2, background: 'rgba(238,92,95,0.25)', color: '#f8a0a2', flexShrink: 0 }}>⚠ {actionCount}</span>}
+        {theme.status && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 2, background: 'rgba(133,135,85,0.25)', color: '#c8d89a', flexShrink: 0 }}>{theme.status}</span>}
+        <a href={theme.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
+      </div>
+      {open && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px' }}>
+          <div style={{ borderLeft: '2px dashed rgba(255,255,255,0.1)', paddingLeft: 10, marginLeft: 6 }}>
+            {subthemes.length > 0
+              ? subthemes.map(s => <HierarchySub key={s.id} sub={s} indicators={indsBySubtheme.get(s.id) || []} questions={qsBySubtheme.get(s.id) || []} />)
+              : <div style={{ padding: '8px 12px', fontSize: 12, color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>No sub-themes in current filter</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Hierarchy = ({ data }) => {
+  const themes     = data.filter(r => r.db === 'Themes');
+  const subthemes  = data.filter(r => r.db === 'Sub-themes');
+  const indicators = data.filter(r => r.db === 'Indicators');
+  const questions  = data.filter(r => r.db === 'Questions');
+
+  // Build lookup maps from Notion relation URLs
+  const subsByTheme = new Map();
+  subthemes.forEach(s => {
+    if (!s.themeId) return;
+    if (!subsByTheme.has(s.themeId)) subsByTheme.set(s.themeId, []);
+    subsByTheme.get(s.themeId).push(s);
+  });
+
+  const indsBySubtheme = new Map();
+  indicators.forEach(ind => {
+    if (!ind.subthemeId) return;
+    if (!indsBySubtheme.has(ind.subthemeId)) indsBySubtheme.set(ind.subthemeId, []);
+    indsBySubtheme.get(ind.subthemeId).push(ind);
+  });
+
+  const qsBySubtheme = new Map();
+  questions.forEach(q => {
+    if (!q.subthemeId) return;
+    if (!qsBySubtheme.has(q.subthemeId)) qsBySubtheme.set(q.subthemeId, []);
+    qsBySubtheme.get(q.subthemeId).push(q);
+  });
+
+  // Sub-themes with no matching theme in current data
+  const linkedSubIds = new Set(subthemes.filter(s => s.themeId && themes.some(t => t.id === s.themeId)).map(s => s.id));
+  const orphanSubs   = subthemes.filter(s => !linkedSubIds.has(s.id));
+
+  if (themes.length === 0 && subthemes.length === 0) {
+    return <div style={{ textAlign: 'center', padding: 60, color: C.dim, fontStyle: 'italic' }}>No data — sync from Notion to populate the hierarchy</div>;
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16, padding: '14px 16px', background: 'rgba(81,20,51,0.08)', borderRadius: 6, borderLeft: `3px solid ${C.plum}`, fontSize: 13, color: C.muted }}>
+        <strong style={{ color: C.plum }}>Hierarchy View</strong> — Theme → Sub-theme → Indicators + Questions. Fully driven by live Notion data. Click ▶ to expand, ↗ to open in Notion.
+      </div>
+      {themes.map(theme => (
+        <HierarchyTheme key={theme.id} theme={theme} subthemes={subsByTheme.get(theme.id) || []} indsBySubtheme={indsBySubtheme} qsBySubtheme={qsBySubtheme} />
+      ))}
+      {orphanSubs.length > 0 && (
+        <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, color: C.white, opacity: 0.75 }}>
+          <div style={{ padding: '12px 16px', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase' }}>
+            Sub-themes (theme not in current filter) — {orphanSubs.length}
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '10px 12px' }}>
+            <div style={{ borderLeft: '2px dashed rgba(255,255,255,0.1)', paddingLeft: 10, marginLeft: 6 }}>
+              {orphanSubs.map(s => <HierarchySub key={s.id} sub={s} indicators={indsBySubtheme.get(s.id) || []} questions={qsBySubtheme.get(s.id) || []} />)}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── SEARCH TAB ───────────────────────────────────────────────────────────────
+const Search = ({ data }) => {
+  const [query, setQuery] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  const [dbFilter, setDbFilter] = useState("ALL");
+
+  const DB_COLORS = { Themes: C.amber, "Sub-themes": C.plum, Indicators: C.olive, Questions: C.forest };
+  const DBS = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
+
+  const scoreItem = (item, terms, fullQ) => {
+    const name  = (item.name   || "").toLowerCase();
+    const notes = (item.notes  || "").toLowerCase();
+    const stat  = (item.status || "").toLowerCase();
+    const all   = `${name} ${notes} ${stat}`;
+    if (!terms.every(t => all.includes(t))) return 0;
+    if (name === fullQ)           return 100;
+    if (name.startsWith(fullQ))   return 85;
+    if (name.includes(fullQ))     return 70;
+    if (terms.every(t => name.includes(t))) return 55;
+    if (notes.includes(fullQ))    return 30;
+    return 15;
+  };
+
+  const results = useMemo(() => {
+    if (!submitted.trim()) return null;
+    const fullQ = submitted.trim().toLowerCase();
+    const terms = fullQ.split(/\s+/).filter(Boolean);
+    return data
+      .filter(r => dbFilter === "ALL" || r.db === dbFilter)
+      .map(r => ({ ...r, _score: scoreItem(r, terms, fullQ) }))
+      .filter(r => r._score > 0)
+      .sort((a, b) => b._score - a._score);
+  }, [submitted, dbFilter, data]);
+
+  const run  = () => { if (query.trim()) setSubmitted(query); };
+  const clear = () => { setQuery(""); setSubmitted(""); };
+
+  const byDb = results
+    ? DBS.slice(1).reduce((acc, db) => { acc[db] = results.filter(r => r.db === db); return acc; }, {})
+    : {};
+
+  const fBtn = (label, val, cur, set) => (
+    <button key={val} onClick={() => set(val)} style={{ padding: "4px 11px", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "inherit", border: `1px solid ${cur === val ? C.forest : C.cloud}`, background: cur === val ? C.forest : "transparent", color: cur === val ? C.white : C.muted, cursor: "pointer" }}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div>
+      {/* ── Search bar ── */}
+      <div style={{ background: C.white, borderRadius: 8, border: `1px solid ${C.cloud}`, padding: "20px 24px", marginBottom: 16 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Search Knowledge Base — {data.length.toLocaleString()} items across 4 databases</div>
+        <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && run()} autoFocus
+            placeholder="Search by name, review notes, or status…"
+            style={{ flex: 1, padding: "11px 16px", border: `2px solid ${submitted ? C.forest : C.cloud}`, borderRadius: 6, fontSize: 14, fontFamily: "inherit", outline: "none", color: C.forest, transition: "border-color 0.15s" }} />
+          <button onClick={run} style={{ padding: "11px 24px", background: C.forest, color: C.white, border: "none", borderRadius: 6, fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", letterSpacing: "0.08em", textTransform: "uppercase" }}>Search</button>
+          {submitted && <button onClick={clear} style={{ padding: "11px 14px", background: "transparent", color: C.muted, border: `1px solid ${C.cloud}`, borderRadius: 6, fontSize: 13, cursor: "pointer" }}>✕</button>}
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>Database</span>
+          {DBS.map(db => fBtn(db === "ALL" ? "All DBs" : db, db, dbFilter, setDbFilter))}
+        </div>
+      </div>
+
+      {/* ── Empty state ── */}
+      {results === null && (
+        <div style={{ textAlign: "center", padding: "56px 0", color: C.dim }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Type to search across Themes, Sub-themes, Indicators and Questions</div>
+          <div style={{ fontSize: 12 }}>Matches on name · review notes · status · Press Enter or click Search</div>
+        </div>
+      )}
+
+      {/* ── No results ── */}
+      {results !== null && results.length === 0 && (
+        <div style={{ textAlign: "center", padding: "48px 0", color: C.dim }}>
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>No results for "{submitted}"</div>
+          <div style={{ fontSize: 12 }}>Try a shorter phrase, a single keyword, or remove filters</div>
+        </div>
+      )}
+
+      {/* ── Results ── */}
+      {results !== null && results.length > 0 && (
+        <div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 14, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: C.forest }}>{results.length.toLocaleString()} result{results.length !== 1 ? "s" : ""} for "{submitted}"</span>
+            {DBS.slice(1).map(db => byDb[db].length > 0 && (
+              <span key={db} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 3, background: DB_COLORS[db] + "18", color: DB_COLORS[db] }}>{db}: {byDb[db].length}</span>
+            ))}
+          </div>
+
+          <div style={{ maxHeight: 620, overflowY: 'auto' }}>
+          {results.map((r, i) => {
+            const col = DB_COLORS[r.db] || C.muted;
+            const hasAction = isActionable(r);
+            return (
+              <div key={r.id + i} style={{ background: C.white, borderRadius: 6, marginBottom: 8, borderLeft: `4px solid ${col}`, border: `1px solid ${C.cloud}`, borderLeftWidth: 4, borderLeftColor: col, borderLeftStyle: "solid" }}>
+                <div style={{ padding: "12px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 7 }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, padding: "2px 7px", borderRadius: 3, background: col + "18", color: col, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>{r.db}</span>
+                    {r.vertical.length > 0 && <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 3, background: C.cloud, color: C.muted, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>{r.vertical.join(', ')}</span>}
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.forest, lineHeight: 1.4, flex: 1 }}>{r.name}</span>
+                    <a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.amber, textDecoration: "none", fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0, marginTop: 2 }}>Open in Notion ↗</a>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    {r.status && <span style={{ fontSize: 11, color: C.muted }}>{r.status}</span>}
+                    {hasAction && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: C.coral + "18", color: C.coral }}>{r.requiresAction}</span>}
+                    {r.actionNeededBy.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: r.actionNeededBy.includes("Kate") ? C.amber + "22" : C.olive + "22", color: r.actionNeededBy.includes("Kate") ? C.amber : C.olive }}>{r.actionNeededBy.join(', ')}</span>}
+                    {r.assignedBy && <span style={{ fontSize: 10, color: C.dim }}>Assigned by: {r.assignedBy}</span>}
+                    {r.deadline && <span style={{ fontSize: 10, color: isOver(r.deadline) ? C.coral : C.dim, fontWeight: isOver(r.deadline) ? 700 : 400 }}>{isOver(r.deadline) ? "⚠ Overdue: " : "Due: "}{r.deadline}</span>}
+                  </div>
+                  {r.notes && <div style={{ marginTop: 8, fontSize: 12, color: C.muted, lineHeight: 1.5, paddingTop: 8, borderTop: `1px solid ${C.cloud}` }}>{r.notes.length > 220 ? r.notes.slice(0, 220) + "…" : r.notes}</div>}
+                </div>
+              </div>
+            );
+          })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── VELOCITY TAB ─────────────────────────────────────────────────────────────
+const Velocity = ({ data }) => {
+  const dbs = ["Themes", "Sub-themes", "Indicators", "Questions"];
+  return <div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+      <Card title="Completion by DB Level">
+        {dbs.map(db => {
+          const items = data.filter(r => r.db === db);
+          const done = items.filter(r => !isActionable(r)).length;
+          const total = items.length || 1;
+          const pct = Math.round(done / total * 100);
+          return <div key={db} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${C.cloud}` }}>
+            <Pill label={db} small />
+            <span style={{ fontSize: 13, fontWeight: 500, minWidth: 100 }}>{db}</span>
+            <div style={{ flex: 1, height: 6, background: C.cloud, borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: "100%", borderRadius: 3, background: C.amber, width: pct + "%" }} />
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.muted, minWidth: 50, textAlign: "right" }}>{done}/{total}</span>
+          </div>;
+        })}
+      </Card>
+      <Card title="Session Handoffs">
+        <div style={{ fontSize: 13, color: C.muted, fontStyle: "italic", padding: "16px 0" }}>Handoff timestamps accumulate as items are actioned on the Today's Batches tab. Full velocity metrics build up over sessions once deployed with live Notion sync.</div>
+      </Card>
+    </div>
+    <Card title="About Velocity Tracking">
+      <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.7 }}>Full velocity metrics — items per day, average cycle time, Belinda vs Kate throughput — will accumulate over sessions as the handoff timestamps build up. The Approve and Return to Kate buttons log each action with a timestamp. Once deployed to Netlify with live Notion sync this view shows trend data over time.</p>
+    </Card>
+  </div>;
+};
+
+// ─── PLATFORM MODELS TAB ──────────────────────────────────────────────────────
+const PlatformTheme = ({ theme }) => {
+  const [open, setOpen] = useState(false);
+  const [openSubs, setOpenSubs] = useState({});
+  const toggleSub = id => setOpenSubs(p => ({ ...p, [id]: !p[id] }));
+  const subCount = theme.subthemes?.length ?? 0;
+  const indicCount = theme.subthemes?.reduce((n, s) => n + (s.indicators?.length ?? 0), 0) ?? 0;
+  const qCount = theme.subthemes?.reduce((n, s) => n + (s.questions?.length ?? 0), 0) ?? 0;
+
+  return <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, overflow: "hidden", color: C.white }}>
+    <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
+      <span style={{ fontSize: 9, transition: "transform 0.15s", transform: open ? "rotate(90deg)" : "none", color: "rgba(255,255,255,0.4)" }}>▶</span>
+      <span style={{ fontSize: 14, fontWeight: 700, flex: 1 }}>{theme.name}</span>
+      {theme.theoryOfChangeStage && <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 2, background: "rgba(240,199,29,0.2)", color: "#F0C71D" }}>{theme.theoryOfChangeStage}</span>}
+      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{subCount} sub-themes · {indicCount} indicators · {qCount} questions</span>
+      <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: "rgba(133,135,85,0.25)", color: "#c8d89a" }}>{theme.status}</span>
+    </div>
+    {open && <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", padding: "10px 12px" }}>
+      <div style={{ borderLeft: "2px dashed rgba(255,255,255,0.1)", paddingLeft: 10, marginLeft: 6 }}>
+        {subCount === 0
+          ? <div style={{ padding: "8px 12px", fontSize: 12, color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>No sub-themes</div>
+          : theme.subthemes.map(sub => {
+            const iCount = sub.indicators?.length ?? 0;
+            const qqCount = sub.questions?.length ?? 0;
+            const hasChildren = iCount > 0 || qqCount > 0;
+            return <div key={sub._id} style={{ borderRadius: 4, marginBottom: 5, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
+              <div onClick={() => hasChildren && toggleSub(sub._id)} style={{ padding: "9px 12px", display: "flex", alignItems: "center", gap: 8, cursor: hasChildren ? "pointer" : "default" }}>
+                {hasChildren && <span style={{ fontSize: 9, transition: "transform 0.15s", transform: openSubs[sub._id] ? "rotate(90deg)" : "none", color: "rgba(255,255,255,0.4)" }}>▶</span>}
+                <span style={{ fontSize: 12, fontWeight: 600, flex: 1, color: "rgba(255,255,255,0.85)" }}>{sub.name}</span>
+                {sub.theoryOfChangeStage && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 2, background: "rgba(240,199,29,0.15)", color: "#F0C71D" }}>{sub.theoryOfChangeStage === "Stage 1 - Output" ? "Stage 1" : "Stage 2"}</span>}
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.3)" }}>{iCount} indicators · {qqCount} questions</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: "rgba(133,135,85,0.2)", color: "#c8d89a" }}>{sub.status}</span>
+              </div>
+              {openSubs[sub._id] && hasChildren && <div style={{ padding: "4px 12px 10px 28px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                {iCount > 0 && <div style={{ marginBottom: qqCount > 0 ? 8 : 0 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(255,255,255,0.25)", textTransform: "uppercase", marginBottom: 4 }}>Indicators</div>
+                  {sub.indicators.map(ind => <div key={ind._id} style={{ padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <span style={{ fontSize: 9, color: "rgba(255,255,255,0.2)", marginTop: 3, flexShrink: 0 }}>◆</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4 }}>{ind.name}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: "rgba(133,135,85,0.2)", color: "#c8d89a", flexShrink: 0, marginLeft: "auto" }}>{ind.status}</span>
+                  </div>)}
+                </div>}
+                {qqCount > 0 && <div>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(77,168,222,0.5)", textTransform: "uppercase", marginBottom: 4 }}>Questions</div>
+                  {sub.questions.map(q => <div key={q._id} style={{ padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <span style={{ fontSize: 9, color: "rgba(77,168,222,0.4)", marginTop: 3, flexShrink: 0 }}>?</span>
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.4, flex: 1 }}>{q.text}</span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.25)", flexShrink: 0 }}>{q.type}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: "rgba(77,168,222,0.15)", color: "#4ea8de", flexShrink: 0 }}>{q.status}</span>
+                  </div>)}
+                </div>}
+              </div>}
+            </div>;
+          })}
+      </div>
+    </div>}
+  </div>;
+};
+
+const PlatformCatalogueRow = ({ item, cols }) => (
+  <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center" }}>
+    {item}
+  </div>
+);
+
+const Platform = ({ data }) => {
+  const [catalogueTab, setCatalogueTab] = useState("standards");
+
+  if (!data) return <div style={{ padding: "40px 0", textAlign: "center", color: C.muted, fontStyle: "italic" }}>
+    Platform data unavailable — check that BACKEND_API_URL and KNOWLEDGEBASE_API_KEY are set in Netlify environment variables.
+  </div>;
+
+  const { summary, themes = [], standards = [], sdgs = [], esgCategories = [], exportedAt } = data;
+
+  const catTabs = [
+    { key: "standards", label: "Standards", count: standards.length },
+    { key: "sdgs", label: "SDGs", count: sdgs.length },
+    { key: "esg", label: "ESG Categories", count: esgCategories.length },
+  ];
+
+  return <div>
+    {/* Summary row */}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
+      {[
+        { val: summary?.themes ?? themes.length, label: "Themes", color: C.plum },
+        { val: summary?.subthemes ?? "—", label: "Sub-themes", color: C.amber },
+        { val: summary?.indicators ?? "—", label: "Indicators", color: C.olive },
+        { val: summary?.questions ?? "—", label: "Questions", color: '#4ea8de' },
+        { val: summary?.standards ?? standards.length, label: "Standards", color: C.forest },
+        { val: summary?.sdgs ?? sdgs.length, label: "SDGs", color: "#11302A" },
+        { val: summary?.esgCategories ?? esgCategories.length, label: "ESG Categories", color: C.muted },
+      ].map(({ val, label, color }) =>
+        <div key={label} style={{ background: C.white, borderRadius: 6, padding: "16px 18px", borderLeft: `4px solid ${color}` }}>
+          <div style={{ fontSize: 30, fontWeight: 700, color: C.forest, lineHeight: 1 }}>{val}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 4, fontWeight: 600 }}>{label}</div>
+        </div>
+      )}
+    </div>
+
+    {/* Theme tree */}
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase", marginBottom: 10 }}>Theme Taxonomy</div>
+      {themes.length === 0
+        ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic", background: C.white, borderRadius: 6 }}>No published themes found</div>
+        : themes.map(t => <PlatformTheme key={t._id} theme={t} />)}
+    </div>
+
+    {/* Catalogue tabs: Standards / SDGs / ESG */}
+    <div style={{ background: C.white, borderRadius: 6, overflow: "hidden" }}>
+      <div style={{ display: "flex", borderBottom: `1px solid ${C.cloud}`, padding: "0 16px" }}>
+        {catTabs.map(ct => <button key={ct.key} onClick={() => setCatalogueTab(ct.key)} style={{ padding: "10px 14px", border: "none", background: "transparent", fontFamily: "inherit", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", color: catalogueTab === ct.key ? C.plum : C.muted, borderBottom: catalogueTab === ct.key ? `2px solid ${C.plum}` : "2px solid transparent", marginBottom: -1 }}>
+          {ct.label} <span style={{ fontSize: 10, color: C.dim }}>({ct.count})</span>
+        </button>)}
+      </div>
+
+      {catalogueTab === "standards" && <div>
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <span>Code</span><span>Name</span><span>Issuing Body</span><span>Status</span>
+        </div>
+        {standards.length === 0
+          ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic" }}>No active standards</div>
+          : standards.map(s => <div key={s._id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 80px", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center", fontSize: 13 }}>
+            <span style={{ fontWeight: 700, color: C.plum }}>{s.code}</span>
+            <span style={{ fontWeight: 500 }}>{s.name}{s.description && <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 2 }}>{s.description}</span>}</span>
+            <span style={{ fontSize: 12, color: C.muted }}>{s.issuingBody}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: s.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: s.status === "active" ? C.olive : C.coral }}>{s.status}</span>
+          </div>)}
+      </div>}
+
+      {catalogueTab === "sdgs" && <div>
+        <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <span>Code</span><span>Goal</span><span>Status</span>
+        </div>
+        {sdgs.length === 0
+          ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic" }}>No active SDGs</div>
+          : sdgs.map(s => <div key={s._id} style={{ display: "grid", gridTemplateColumns: "70px 1fr 80px", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center", fontSize: 13 }}>
+            <span style={{ fontWeight: 700, color: C.amber }}>{s.code}</span>
+            <span style={{ fontWeight: 500 }}>{s.name}{s.description && <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 2 }}>{s.description}</span>}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: s.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: s.status === "active" ? C.olive : C.coral }}>{s.status}</span>
+          </div>)}
+      </div>}
+
+      {catalogueTab === "esg" && <div>
+        <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 110px 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <span>Code</span><span>Name</span><span>Type</span><span>Status</span>
+        </div>
+        {esgCategories.length === 0
+          ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic" }}>No active ESG categories</div>
+          : esgCategories.map(e => {
+            const typeColor = { Environmental: C.olive, Social: C.amber, Governance: C.plum }[e.type] || C.muted;
+            return <div key={e._id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 110px 80px", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center", fontSize: 13 }}>
+              <span style={{ fontWeight: 700, color: C.forest }}>{e.code}</span>
+              <span style={{ fontWeight: 500 }}>{e.name}{e.description && <span style={{ display: "block", fontSize: 11, color: C.muted, marginTop: 2 }}>{e.description}</span>}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: typeColor + "20", color: typeColor }}>{e.type}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: e.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: e.status === "active" ? C.olive : C.coral }}>{e.status}</span>
+            </div>;
+          })}
+      </div>}
+    </div>
+
+    {exportedAt && <div style={{ marginTop: 10, fontSize: 11, color: C.dim, textAlign: "right" }}>Last exported from platform: {new Date(exportedAt).toLocaleString()}</div>}
+  </div>;
+};
+
+// ─── DISCREPANCIES TAB ───────────────────────────────────────────────────────
+const Discrepancies = ({ discrepancies, allData, platformData }) => {
+  const [dbFilter, setDbFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [verticalFilter, setVerticalFilter] = useState('ALL');
+
+  if (!platformData) return (
+    <div style={{ textAlign: "center", padding: 60, color: C.dim, fontStyle: "italic" }}>
+      Backend not connected — set BACKEND_API_URL and KNOWLEDGEBASE_API_KEY to enable discrepancy detection.
+    </div>
+  );
+
+  const inScope  = r => Array.isArray(r.vertical) && r.vertical.some(v => IN_SCOPE_VERTICALS.includes(v));
+  const inScopeQ = r => true; // Questions rollup unfixed → keep all in scope; change to the inScope form once fixed
+  const { themes, subthemes, indicators, questions } = discrepancies;
+
+  // Totals: structured items scoped to in-scope verticals; questions kept broad until the rollup field is fixed
+  const totals = {
+    Themes:       allData.filter(r => r.db === 'Themes'     && inScope(r)).length,
+    'Sub-themes': allData.filter(r => r.db === 'Sub-themes' && inScope(r)).length,
+    Indicators:   allData.filter(r => r.db === 'Indicators' && inScope(r)).length,
+    Questions:    allData.filter(r => r.db === 'Questions'  && inScopeQ(r)).length,
+  };
+
+  const allRows = [
+    ...themes.map(r => ({ ...r, _db: 'Themes' })),
+    ...subthemes.map(r => ({ ...r, _db: 'Sub-themes' })),
+    ...indicators.map(r => ({ ...r, _db: 'Indicators' })),
+    ...(questions || []).map(r => ({ ...r, _db: 'Questions' })),
+  ];
+
+  const notionStatuses = [...new Set(allRows.map(r => r.status).filter(Boolean))].sort();
+
+  const rows = allRows
+    .filter(r => dbFilter === 'ALL' || r._db === dbFilter)
+    .filter(r => statusFilter === 'ALL' || r.status === statusFilter)
+    .filter(r => verticalFilter === 'ALL' || (Array.isArray(r.vertical) && r.vertical.includes(verticalFilter)));
+
+  const totalMissing = themes.length + subthemes.length + indicators.length + (questions || []).length;
+  const filterBtn = (label, val, current, setter, count) => (
+    <button key={val} onClick={() => setter(val)} style={{ padding: "5px 12px", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "inherit", border: `1px solid ${current === val ? C.coral : C.cloud}`, background: current === val ? C.coral + "18" : "transparent", color: current === val ? C.coral : C.muted, cursor: "pointer" }}>
+      {label}{count !== undefined ? ` (${count})` : ''}
+    </button>
+  );
+
+  const dbColors = { Themes: C.amber, 'Sub-themes': C.plum, Indicators: C.olive, Questions: C.sky || '#4ea8de' };
+  const vCount = v => allRows.filter(r => Array.isArray(r.vertical) && r.vertical.includes(v)).length;
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 16, marginBottom: 24 }}>
+        <KPI val={totalMissing} label="Total missing" accent={C.coral} />
+        <KPI val={themes.length} label="Themes" accent={C.amber} />
+        <KPI val={subthemes.length} label="Sub-themes" accent={C.plum} />
+        <KPI val={indicators.length} label="Indicators" accent={C.olive} />
+        <KPI val={(questions || []).length} label="Questions" accent={C.sky || '#4ea8de'} />
+      </div>
+
+      {['Themes', 'Sub-themes', 'Indicators', 'Questions'].map(db => {
+        const total = totals[db] || 0;
+        const missing = (discrepancies[db === 'Themes' ? 'themes' : db === 'Sub-themes' ? 'subthemes' : db === 'Indicators' ? 'indicators' : 'questions'] || []).length;
+        const synced = total - missing;
+        const pct = total > 0 ? Math.round(synced / total * 100) : 100;
+        const color = dbColors[db];
+        return (
+          <div key={db} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, marginBottom: 4, color: C.muted }}>
+              <span style={{ color }}>{db}</span>
+              <span>{synced} / {total} transferred &nbsp;<span style={{ color: pct === 100 ? C.olive : C.coral, fontWeight: 700 }}>{pct}%</span></span>
+            </div>
+            <div style={{ height: 5, background: C.cloud, borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 3 }} />
+            </div>
+          </div>
+        );
+      })}
+
+      <div style={{ background: "rgba(133,135,85,0.07)", border: `1px solid ${C.cloud}`, borderRadius: 6, padding: "10px 14px", marginTop: 20, marginBottom: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.olive, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: 4 }}>Vertical</span>
+        {filterBtn('All', 'ALL', verticalFilter, setVerticalFilter)}
+        {filterBtn('RfC', 'RfC', verticalFilter, setVerticalFilter, vCount('RfC'))}
+        {filterBtn('RfN', 'RfN', verticalFilter, setVerticalFilter, vCount('RfN'))}
+        {filterBtn('C4C', 'C4C', verticalFilter, setVerticalFilter, vCount('C4C'))}
+        <span style={{ fontSize: 10, color: C.dim, fontStyle: "italic", marginLeft: 8 }}>Gap counts above include all in-scope verticals</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: 4 }}>DB</span>
+        {filterBtn('All', 'ALL', dbFilter, setDbFilter)}
+        {filterBtn('Themes', 'Themes', dbFilter, setDbFilter, themes.length)}
+        {filterBtn('Sub-themes', 'Sub-themes', dbFilter, setDbFilter, subthemes.length)}
+        {filterBtn('Indicators', 'Indicators', dbFilter, setDbFilter, indicators.length)}
+        {filterBtn('Questions', 'Questions', dbFilter, setDbFilter, (questions || []).length)}
+        <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginLeft: 12, marginRight: 4 }}>Status</span>
+        {filterBtn('All', 'ALL', statusFilter, setStatusFilter)}
+        {notionStatuses.map(s => filterBtn(s, s, statusFilter, setStatusFilter))}
+      </div>
+
+      {rows.length === 0
+        ? <div style={{ textAlign: "center", padding: 40, color: C.olive, fontStyle: "italic", fontWeight: 600 }}>✓ All {dbFilter === 'ALL' ? '' : dbFilter + ' '}items transferred to backend</div>
+        : <div style={{ background: C.white, borderRadius: 8, border: `1px solid ${C.cloud}`, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 110px 80px 80px", gap: 0, background: C.off, borderBottom: `1px solid ${C.cloud}`, padding: "8px 16px" }}>
+              {['Database', 'Name', 'Notion Status', 'Vertical', 'Link'].map(h => (
+                <span key={h} style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase" }}>{h}</span>
+              ))}
+            </div>
+            {rows.map((r, i) => (
+              <div key={r.id} style={{ display: "grid", gridTemplateColumns: "120px 1fr 110px 80px 80px", gap: 0, padding: "10px 16px", borderBottom: i < rows.length - 1 ? `1px solid ${C.cloud}` : "none", alignItems: "center", background: i % 2 === 0 ? C.white : "#faf9f6" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: dbColors[r._db] || C.muted }}>{r._db}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: C.forest, paddingRight: 16 }}>{r.name || '—'}</span>
+                <span style={{ fontSize: 11, color: C.muted }}>{r.status || '—'}</span>
+                <span style={{ fontSize: 11, color: C.dim }}>{r.vertical.length ? r.vertical.join(', ') : '—'}</span>
+                <a href={r.url} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: C.amber, textDecoration: "none", fontWeight: 600 }}>View ↗</a>
+              </div>
+            ))}
+          </div>
+      }
+      <div style={{ marginTop: 10, fontSize: 11, color: C.dim, textAlign: "right" }}>
+        Showing {rows.length} of {allRows.length} missing items
+      </div>
+    </div>
+  );
+};
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState("overview");
+  const [workMode, setWorkModeState] = useState("ALL");
+  const [vFilter, setVFilter] = useState("ALL");
+  const [oFilter, setOFilter] = useState("ALL");
+  const [assignedByFilter, setAssignedByFilter] = useState("ALL");
+  const [batchSize, setBatchSize] = useState(10);
+  const [syncMsg, setSyncMsg] = useState("Loading…");
+  const [allData, setAllData] = useState(normItems(SEED_DATA));
+  const [platformData, setPlatformData] = useState(null);
+  const [dbCounts, setDbCounts] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  const fetchData = () => {
+    setSyncing(true);
+    fetch("/.netlify/functions/notion-data", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        const items = normItems(Array.isArray(data) ? data : SEED_DATA);
+        setAllData(items);
+        const counts = items.reduce((acc, item) => { acc[item.db] = (acc[item.db] || 0) + 1; return acc; }, {});
+        setDbCounts(counts);
+        setSyncMsg(`Live · ${items.length} QA items · ${new Date().toLocaleTimeString()}`);
+      })
+      .catch(() => {
+        setAllData(normItems(SEED_DATA));
+        setDbCounts(null);
+        setSyncMsg("Demo mode · Notion function unavailable");
+      })
+      .finally(() => setSyncing(false));
+
+    fetch("/.netlify/functions/backend-data", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => setPlatformData(data))
+      .catch(() => setPlatformData(null));
+  };
+
+  useEffect(() => { fetchData(); }, []);
+  const discrepancies = useMemo(() => computeDiscrepancies(allData, platformData), [allData, platformData]);
+
+  // Derive owner options: always include NAMED_OWNERS as a baseline,
+  // plus anyone else found in live data (e.g. new people added in Notion)
+  const ownerOptions = useMemo(() => {
+    const fromData = allData.flatMap(r => r.actionNeededBy).filter(Boolean);
+    const merged = [...new Set([...NAMED_OWNERS, ...fromData])].sort();
+    return ['ALL', ...merged];
+  }, [allData]);
+
+  const assignedByOptions = useMemo(() => {
+    const fromData = allData.map(r => r.assignedBy).filter(Boolean);
+    const merged = [...new Set([...NAMED_OWNERS, ...fromData])].sort();
+    return ['ALL', ...merged];
+  }, [allData]);
+
+  // Reset oFilter if the current value is no longer in the live data options
+  React.useEffect(() => {
+    if (oFilter !== 'ALL' && !ownerOptions.includes(oFilter)) setOFilter('ALL');
+  }, [ownerOptions]);
+
+  React.useEffect(() => {
+    if (assignedByFilter !== 'ALL' && !assignedByOptions.includes(assignedByFilter)) setAssignedByFilter('ALL');
+  }, [assignedByOptions]);
+
+  const filtered = allData.filter(r =>
+    (vFilter === "ALL" || (Array.isArray(r.vertical) && r.vertical.includes(vFilter))) &&
+    (oFilter === "ALL" || r.actionNeededBy.includes(oFilter)) &&
+    (assignedByFilter === "ALL" || r.assignedBy === assignedByFilter) &&
+    (workMode === "ALL" || r.db === workMode)
+  );
+
+  const TABS = ["overview", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "discrepancies"];
+  const TAB_LABELS = { overview: "Overview", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Models", discrepancies: "⚠ Sync Gaps" };
+  const MODES = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
+
+  const headerBtn = (label, onClick, active) => (
+    <button onClick={onClick} style={{ padding: "4px 12px", borderRadius: 3, fontSize: 11, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", background: active ? C.amber : "transparent", color: active ? C.white : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.12s" }}>{label}</button>
+  );
+
+  return (
+    <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", background: C.off, minHeight: "100vh" }}>
+      {/* HEADER */}
+      <div style={{ background: C.forest, padding: "20px 32px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.3em", color: C.amber, textTransform: "uppercase", marginBottom: 4 }}>ConnectGo · Knowledge Base</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: C.white, letterSpacing: -1 }}>Knowledge Base Dashboard</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 3 }}>Tracking review progress · Themes · Sub-themes · Indicators · Questions</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            {[["Vertical", ["ALL", "RfC", "RfN", "C4C"], vFilter, setVFilter], ["Action Needed By", ownerOptions, oFilter, setOFilter], ["Assigned by", assignedByOptions, assignedByFilter, setAssignedByFilter]].map(([label, opts, val, set]) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
+                <select value={val} onChange={e => set(e.target.value)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
+                  {opts.map(o => <option key={o} value={o} style={{ background: C.forest, color: C.white }}>{o}</option>)}
+                </select>
+              </div>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>Batch</span>
+              <input type="number" value={batchSize} onChange={e => setBatchSize(parseInt(e.target.value) || 10)} min={5} max={25} style={{ width: 50, padding: "6px 8px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 4, color: C.white, fontSize: 13, fontFamily: "inherit", textAlign: "center" }} />
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ position: "relative" }} onMouseEnter={() => setShowTooltip(true)} onMouseLeave={() => setShowTooltip(false)}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.25)", letterSpacing: "0.05em", cursor: dbCounts ? "help" : "default" }}>{syncMsg}</div>
+              {showTooltip && dbCounts && (
+                <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#0d2620", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, padding: "10px 14px", minWidth: 190, zIndex: 100, boxShadow: "0 4px 20px rgba(0,0,0,0.5)", pointerEvents: "none" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.amber, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Items by database</div>
+                  {Object.entries(dbCounts).map(([db, count]) => (
+                    <div key={db} style={{ display: "flex", justifyContent: "space-between", gap: 20, fontSize: 12, color: "rgba(255,255,255,0.7)", padding: "3px 0" }}>
+                      <span>{db}</span>
+                      <span style={{ fontWeight: 700, color: C.white }}>{count.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: 8, paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+                    <span>Total</span>
+                    <span style={{ fontWeight: 700, color: "rgba(255,255,255,0.6)" }}>{Object.values(dbCounts).reduce((a, b) => a + b, 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={fetchData} disabled={syncing} style={{ padding: "3px 9px", borderRadius: 3, fontSize: 10, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: syncing ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.45)", cursor: syncing ? "not-allowed" : "pointer" }}>
+              {syncing ? "Syncing…" : "↻ Sync"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* MODE BAR */}
+      <div style={{ background: C.plum, padding: "0 32px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
+        <div style={{ display: "flex" }}>
+          {TABS.map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding: "11px 16px", border: "none", background: "transparent", color: tab === t ? C.yellow : "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, fontFamily: "inherit", cursor: "pointer", borderBottom: tab === t ? `2px solid ${C.yellow}` : "2px solid transparent", letterSpacing: "0.1em", textTransform: "uppercase", transition: "all 0.15s", marginBottom: -1 }}>
+              {TAB_LABELS[t]}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 6, padding: "8px 0", alignItems: "center" }}>
+          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginRight: 4 }}>Work Mode:</span>
+          {MODES.map(m => headerBtn(m === "ALL" ? "All" : m, () => setWorkModeState(m), workMode === m))}
+        </div>
+      </div>
+
+      {/* WORK MODE BANNER */}
+      {workMode !== "ALL" && (
+        <div style={{ background: C.amber, padding: "10px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.white, letterSpacing: "0.08em", textTransform: "uppercase" }}>Working on {workMode}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 2 }}>Showing only {workMode.toLowerCase()} — all other levels hidden</div>
+          </div>
+          <button onClick={() => setWorkModeState("ALL")} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: C.white, padding: "6px 14px", borderRadius: 3, fontFamily: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>EXIT</button>
+        </div>
+      )}
+
+      {/* CONTENT */}
+      <div style={{ padding: "24px 32px", maxWidth: 1500, margin: "0 auto" }}>
+        {tab === "overview" && <Overview filtered={filtered} discrepancies={discrepancies} allData={allData} />}
+        {tab === "today" && <Today filtered={filtered} batchSize={batchSize} />}
+        {tab === "pipeline" && <Pipeline filtered={filtered} />}
+        {tab === "quality" && <Quality filtered={filtered} />}
+        {tab === "hierarchy" && <Hierarchy data={filtered} />}
+        {tab === "search" && <Search data={filtered} />}
+        {tab === "velocity" && <Velocity data={filtered} />}
+        {tab === "platform" && <Platform data={platformData} />}
+        {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={allData} platformData={platformData} />}
+      </div>
+
+      {/* FOOTER */}
+      <div style={{ padding: "12px 32px", fontSize: 11, color: "rgba(255,255,255,0.3)", background: C.forest, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span><strong style={{ color: "rgba(255,255,255,0.55)" }}>CONNECT GO</strong> · Knowledge Base Quality Dashboard · v2.1</span>
+        <a href="https://app.notion.com/p/38060bfb014e8160ad26d9f2f200f464" target="_blank" rel="noreferrer" style={{ color: C.amber, textDecoration: "none" }}>KB Quality Review — Rating Scale</a>
+      </div>
+    </div>
+  );
+}
+
+const domRoot = ReactDOM.createRoot(document.getElementById('root'));
+domRoot.render(React.createElement(App));
+</script>
+</body>
+</html>
