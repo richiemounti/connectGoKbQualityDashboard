@@ -36,7 +36,8 @@ NOTION FIELD NAMES TO EXTRACT PER DB:
 
   ALL FOUR DBs — QA fields (added June 2026):
     "Requires Action"          → select field
-    "Action Needed By"         → select field (Belinda / Kate / Both)
+    "Action Needed By"         → multi-select field (Belinda / Kate / Hope / Hannah)
+    "Assigned by"              → select field (Kate / Hannah / Belinda / Hope)
     "Action Deadline"          → date field (ISO string)
     "Taxonomic Thinking ★"     → select field (extract leading number 1-5)
     "Completeness ★"           → select field (extract leading number 1-5)
@@ -80,7 +81,8 @@ JSON RESPONSE SCHEMA (array of objects):
       "status":          string,   // status field value
       "vertical":        string,   // "C4C" | "RfC" | "RfN" | null
       "requiresAction":  string,   // select value or null
-      "actionNeededBy":  string,   // "Belinda" | "Kate" | "Hope" | "Hannah" | null
+      "actionNeededBy":  string[], // people responsible for the action
+      "assignedBy":      string,   // "Kate" | "Hannah" | "Belinda" | "Hope" | null
       "deadline":        string,   // ISO date string or null
       "taxonomic":       number,   // 1-5 or null
       "completeness":    number,   // 1-5 or null
@@ -159,8 +161,8 @@ const SEED_DATA = [
   { id: "s6", db: "Sub-themes", name: "Adoption of Climate Measures and Actions", themeId: "t2", vertical: "RfC", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-21", taxonomic: 4, construct: 4, design: 4, notes: "Provisionally approved. ToC Stage and question scope to verify", url: "https://app.notion.com/p/36860bfb014e812d896fc7f9a25e363a" },
   { id: "s7", db: "Sub-themes", name: "Climate Change Knowledge and Awareness", themeId: "t2", vertical: "RfC", status: "Approved", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-21", taxonomic: 5, construct: 5, design: 4, notes: "Well-scoped. Check boundary with Emotional/Perceptual sub-theme", url: "https://app.notion.com/p/36860bfb014e81b88e9fe5d71b7b6833" },
   { id: "s8", db: "Sub-themes", name: "Emotional and Perceptual Responses to Climate Change", themeId: "t2", vertical: "RfC", status: "Approved", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-21", taxonomic: 5, construct: 5, design: 4, notes: "Provisionally approved. Boundary check needed", url: "https://app.notion.com/p/36860bfb014e81d5ac7cf21a26bc53c8" },
-  { id: "s9", db: "Sub-themes", name: "Perceived Social Burdens and Tensions", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: "No Action Required", url: "https://app.notion.com/p/31b60bfb014e80109a82d2a5f0217410" },
-  { id: "s10", db: "Sub-themes", name: "Perceived Fairness of Benefit Distribution", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: "No Action Required", url: "https://app.notion.com/p/31b60bfb014e808d909afeb5ab9bd0be" },
+  { id: "s9", db: "Sub-themes", name: "Perceived Social Burdens and Tensions", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/31b60bfb014e80109a82d2a5f0217410" },
+  { id: "s10", db: "Sub-themes", name: "Perceived Fairness of Benefit Distribution", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/31b60bfb014e808d909afeb5ab9bd0be" },
 
   // ── C4C Indicators (awaiting Kate review) ────────────────────────────────────
   { id: "i1", db: "Indicators", name: "Proportion of caregivers who report applying at least one programme-learned strategy at home with their child since their last session", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 3, notes: "Strong behaviour transfer construct. Check response option framing — retrospective period needs tightening.", url: "https://app.notion.com/p/33e60bfb014e8171b86cf23b00767ef5" },
@@ -174,7 +176,7 @@ const SEED_DATA = [
   { id: "i9", db: "Indicators", name: "Proportion of caregivers who report their child has access to a designated, adequately lit, and reasonably quiet space for homework or study at home", themeId: "c4c-hc", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 5, notes: "Prerequisite infrastructure indicator. Clean and well-specified.", url: "https://app.notion.com/p/33e60bfb014e81f3bf2fdf4edc194a65" },
   { id: "i10", db: "Indicators", name: "Proportion of caregivers who report cultural norms or gender-based expectations as preventing or limiting their engagement with school", themeId: "c4c-ei", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 3, notes: "Diagnostic indicator. Sensitive framing needed — check Swahili translation guidance for 'cultural norms'.", url: "https://app.notion.com/p/33e60bfb014e8193b40ef1ec0f726433" },
   { id: "i11", db: "Indicators", name: "Proportion of caregivers who score at or above the adequacy threshold on a validated brief resilience scale", themeId: "c4c-pw", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 3, design: 4, notes: "Which validated scale? Adequacy threshold not defined in current descriptor. Needs citation.", url: "https://app.notion.com/p/33e60bfb014e817cb2aae30118ff6a44" },
-  { id: "i12", db: "Indicators", name: "Proportion of caregivers who attended at least one programme engagement activity in the reporting year", themeId: "c4c-ce", vertical: "C4C", status: "Approved", requiresAction: "No Action Required", url: "https://app.notion.com/p/36160bfb014e813b8772ed2344f09cfc" },
+  { id: "i12", db: "Indicators", name: "Proportion of caregivers who attended at least one programme engagement activity in the reporting year", themeId: "c4c-ce", vertical: "C4C", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/36160bfb014e813b8772ed2344f09cfc" },
 
   // ── C4C Questions (Belinda to complete) ──────────────────────────────────────
   { id: "q1", db: "Questions", name: "In the past six months, have you tried any of the learning support strategies you heard about in the programme sessions at home with your child?", themeId: "c4c-ce", vertical: "C4C", status: "In Development", requiresAction: "Complete Missing Fields", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 1, design: 3, notes: "Missing response options entirely. Also needs ToC Stage and sub-theme link.", url: "https://app.notion.com/p/33e60bfb014e8171b86cf23b00767ef5" },
@@ -187,7 +189,13 @@ const SEED_DATA = [
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const normVert = v => Array.isArray(v) ? v : (v == null || v === "" ? [] : [v]);
-const normItems = arr => (Array.isArray(arr) ? arr : []).map(r => ({ ...r, vertical: normVert(r.vertical), actionNeededBy: normVert(r.actionNeededBy) }));
+// Retired records are intentionally excluded everywhere. A record still marked
+// "Retire" remains visible until its Notion status changes to "Retired".
+const isRetired = r => String(r?.status || "").trim().toLowerCase() === "retired";
+const isActionable = r => Boolean(r?.requiresAction);
+const normItems = arr => (Array.isArray(arr) ? arr : [])
+  .map(r => ({ ...r, vertical: normVert(r.vertical), actionNeededBy: normVert(r.actionNeededBy), assignedBy: r.assignedBy || null }))
+  .filter(r => !isRetired(r));
 const parseR = v => { if (v == null) return null; if (typeof v === "number") return v; const m = String(v).match(/^(\d)/); return m ? parseInt(m[1]) : null; };
 const avgR = arr => { const v = arr.map(parseR).filter(x => x !== null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 const todayStr = () => new Date().toISOString().split('T')[0];
@@ -213,10 +221,9 @@ const PILL_STYLES = {
   "Hannah":  { bg: "rgba(78,124,168,0.15)", color: "#234e72" },
   "Revise and Resubmit":       { bg: "rgba(238,92,95,0.12)",  color: "#901818" },
   "Complete Missing Fields":   { bg: "rgba(240,199,29,0.12)", color: "#7A6000" },
-  "Awaiting Decision":         { bg: "rgba(205,128,40,0.12)", color: "#7A4800" },
   "Awaiting Sign-off":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
   "Ready to Publish":          { bg: "rgba(17,48,42,0.08)",   color: C.forest },
-  "No Action Required":        { bg: "rgba(133,135,85,0.08)", color: C.muted },
+  "Retire":                    { bg: "rgba(238,92,95,0.12)", color: "#901818" },
   "Discuss with Kate":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
   "Discuss with Hope":         { bg: "rgba(196,123,58,0.1)",  color: "#7a4000" },
   "Discuss with Hannah":       { bg: "rgba(78,124,168,0.1)",  color: "#234e72" },
@@ -260,14 +267,14 @@ const Card = ({ title, sub, children, mb }) => (
 );
 
 const ActionPill = ({ action }) => {
-  const labels = { "Complete Missing Fields": "Complete Fields", "Revise and Resubmit": "Revise", "Awaiting Decision": "Decision", "Awaiting Sign-off": "Sign-off", "Ready to Publish": "Ready", "No Action Required": "No Action" };
+  const labels = { "Complete Missing Fields": "Complete Fields", "Revise and Resubmit": "Revise", "Awaiting Sign-off": "Sign-off", "Ready to Publish": "Ready", "Retire": "Retire" };
   return <Pill label={action} />;
 };
 
 // ─── PERSON QUEUE CARD ────────────────────────────────────────────────────────
 const PersonQueueCard = ({ person, filtered }) => {
   const cfg = PEOPLE[person] || { color: C.muted, initials: person.slice(0, 2).toUpperCase(), role: '' };
-  const queue = filtered.filter(r => r.actionNeededBy.includes(person) && r.requiresAction && r.requiresAction !== 'No Action Required');
+  const queue = filtered.filter(r => r.actionNeededBy.includes(person) && isActionable(r));
   const overdue  = queue.filter(r => isOver(r.deadline)).length;
   const dueWeek  = queue.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
   const noDl     = queue.length - overdue - dueWeek;
@@ -335,12 +342,11 @@ function computeDiscrepancies(notionData, platformData) {
 
 // ─── ACTION BREAKDOWN (expandable) ───────────────────────────────────────────
 const ACTION_COLORS = {
-  'No Action Required':      C.olive,
   'Complete Missing Fields': '#F0C71D',
   'Revise and Resubmit':     C.coral,
-  'Awaiting Decision':       C.amber,
   'Awaiting Sign-off':       C.plum,
   'Ready to Publish':        C.forest,
+  'Retire':                  C.coral,
 };
 const actionColor = k => {
   if (ACTION_COLORS[k]) return ACTION_COLORS[k];
@@ -355,7 +361,7 @@ const ActionBreakdown = ({ filtered, total }) => {
   const [shown, setShown] = useState({});
 
   const aC = {};
-  filtered.forEach(r => { if (r.requiresAction) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+  filtered.forEach(r => { if (isActionable(r)) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
 
   const toggle = k => setExpanded(e => ({ ...e, [k]: !e[k] }));
   const showMore = (e, k, items) => {
@@ -419,11 +425,11 @@ const ActionBreakdown = ({ filtered, total }) => {
 
 const Overview = ({ filtered, discrepancies, allData }) => {
   const total = filtered.length;
-  const needs = filtered.filter(r => r.requiresAction && r.requiresAction !== "No Action Required").length;
+  const needs = filtered.filter(isActionable).length;
   const over  = filtered.filter(r => isOver(r.deadline)).length;
   const wk    = filtered.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
   const aC = {};
-  filtered.forEach(r => { if (r.requiresAction) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+  filtered.forEach(r => { if (isActionable(r)) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
 
   const dims = ["taxonomic", "completeness", "construct", "design"];
   const dL   = ["Taxonomic Thinking", "Completeness", "Construct Understanding", "Design"];
@@ -432,10 +438,9 @@ const Overview = ({ filtered, discrepancies, allData }) => {
   const FIXED_STAGES = [
     { key: 'Complete Missing Fields', color: '#F0C71D', owner: 'Belinda' },
     { key: 'Revise and Resubmit',     color: C.coral,   owner: 'Belinda' },
-    { key: 'Awaiting Decision',       color: C.amber,   owner: null },
     { key: 'Awaiting Sign-off',       color: C.plum,    owner: 'Kate' },
     { key: 'Ready to Publish',        color: C.forest,  owner: null },
-    { key: 'No Action Required',      color: C.olive,   owner: null },
+    { key: 'Retire',                  color: C.coral,   owner: null },
   ];
   // Dynamic discuss stages derived from live data
   const discussStages = [...new Set(
@@ -556,7 +561,7 @@ const Overview = ({ filtered, discrepancies, allData }) => {
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
 const Today = ({ filtered, batchSize }) => {
   const buildBatch = (owner) => filtered
-    .filter(r => r.actionNeededBy.includes(owner) && r.requiresAction && r.requiresAction !== "No Action Required")
+    .filter(r => r.actionNeededBy.includes(owner) && isActionable(r))
     .sort((a, b) => {
       // Overdue first, then soonest/most-recent deadline, then undated last.
       if (isOver(a.deadline) !== isOver(b.deadline)) return isOver(a.deadline) ? -1 : 1;
@@ -565,10 +570,8 @@ const Today = ({ filtered, batchSize }) => {
     })
     .slice(0, batchSize);
 
-  // Show a column for every owner who has at least one actionable item
-  const activeOwners = NAMED_OWNERS.filter(o =>
-    filtered.some(r => r.actionNeededBy.includes(o) && r.requiresAction && r.requiresAction !== "No Action Required")
-  );
+  // Always show each named person's batch, including Hannah when her queue is empty.
+  const activeOwners = NAMED_OWNERS;
 
   const BatchItem = ({ r, i, owner }) => {
     const cfg = PEOPLE[owner] || { color: C.muted };
@@ -583,6 +586,7 @@ const Today = ({ filtered, batchSize }) => {
             {(r.vertical || []).map(v => <Pill key={v} label={v} small />)}
             {r.deadline && <span style={{ color: isOver(r.deadline) ? C.coral : C.dim, fontWeight: isOver(r.deadline) ? 700 : 400 }}>{isOver(r.deadline) ? '⚠ ' : ''}{r.deadline}</span>}
           </div>
+          {r.assignedBy && <div style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>Assigned by: <span style={{ fontWeight: 600 }}>{r.assignedBy}</span></div>}
           {r.developedBy && <div style={{ fontSize: 10, color: C.dim, marginTop: 3 }}>Developed by: <span style={{ fontWeight: 600 }}>{r.developedBy}</span></div>}
           {r.approvedBy  && <div style={{ fontSize: 10, color: C.dim, marginTop: 1 }}>Approved by: <span style={{ fontWeight: 600 }}>{r.approvedBy}</span></div>}
           {r.notes && <div style={{ fontSize: 11, color: C.muted, marginTop: 4, fontStyle: "italic" }}>{r.notes.slice(0, 120)}{r.notes.length > 120 ? "…" : ""}</div>}
@@ -601,7 +605,7 @@ const Today = ({ filtered, batchSize }) => {
       {activeOwners.map(owner => {
         const cfg = PEOPLE[owner] || { color: C.muted };
         const batch = buildBatch(owner);
-        const qTotal = filtered.filter(r => r.actionNeededBy.includes(owner) && r.requiresAction && r.requiresAction !== "No Action Required").length;
+        const qTotal = filtered.filter(r => r.actionNeededBy.includes(owner) && isActionable(r)).length;
         return (
           <Card key={owner} title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -623,7 +627,7 @@ const Today = ({ filtered, batchSize }) => {
 
 // ─── PIPELINE TAB ─────────────────────────────────────────────────────────────
 const Pipeline = ({ filtered }) => {
-  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Decision", "Awaiting Sign-off", "Ready to Publish", "No Action Required"];
+  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Sign-off", "Ready to Publish", "Retire"];
   const discussStages = [...new Set(filtered.map(r => r.requiresAction).filter(v => v && v.startsWith('Discuss with')))].sort();
   const allStages     = [...FIXED_STAGES, ...discussStages];
 
@@ -633,11 +637,12 @@ const Pipeline = ({ filtered }) => {
     const items = filtered.filter(r => r.requiresAction === s);
     if (!items.length) return null;
     const isDiscuss = s.startsWith('Discuss with');
-    const stageColor = isDiscuss ? (PEOPLE[s.replace('Discuss with ', '')] || {}).color || C.muted : C.amber;
+    const stageColor = actionColor(s);
 
     // Decide which attribution columns to show for this stage's items
-    const showDeveloped = items.some(r => r.developedBy);
-    const showApproved  = items.some(r => r.approvedBy);
+    const showAssignedBy = items.some(r => r.assignedBy);
+    const showDeveloped  = items.some(r => r.developedBy);
+    const showApproved   = items.some(r => r.approvedBy);
 
     return <div key={s} style={{ background: C.white, borderRadius: 6, padding: "20px 22px", marginBottom: 16, borderLeft: isDiscuss ? `4px dashed ${stageColor}55` : 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
@@ -648,7 +653,7 @@ const Pipeline = ({ filtered }) => {
       <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 380 }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead><tr>
-            {["Item", "DB", "Owner", "Vertical", "Deadline",
+            {["Item", "DB", "Action Needed By", ...(showAssignedBy ? ["Assigned by"] : []), "Vertical", "Deadline",
               ...(showDeveloped ? ["Developed By"] : []),
               ...(showApproved  ? ["Approved By"]  : []),
               "Link"
@@ -658,6 +663,7 @@ const Pipeline = ({ filtered }) => {
             <td style={{ ...tdStyle, fontWeight: 600, maxWidth: 320 }}>{r.name}</td>
             <td style={tdStyle}><Pill label={r.db} small /></td>
             <td style={tdStyle}>{r.actionNeededBy.length ? r.actionNeededBy.map(a => <Pill key={a} label={a} small />) : '—'}</td>
+            {showAssignedBy && <td style={{ ...tdStyle, fontSize: 11, color: C.muted }}>{r.assignedBy || "—"}</td>}
             <td style={{ ...tdStyle, fontSize: 11 }}>{r.vertical.length ? r.vertical.join(', ') : "—"}</td>
             <td style={{ ...tdStyle, color: isOver(r.deadline) ? C.coral : "inherit", fontWeight: isOver(r.deadline) ? 700 : 400, whiteSpace: 'nowrap' }}>{r.deadline || "—"}</td>
             {showDeveloped && <td style={{ ...tdStyle, fontSize: 11, color: C.muted }}>{r.developedBy || "—"}</td>}
@@ -736,7 +742,7 @@ const Quality = ({ filtered }) => {
 // Sub-theme row — expandable, shows indicators + questions inside
 const HierarchySub = ({ sub, indicators, questions }) => {
   const [open, setOpen] = useState(false);
-  const hasAction = sub.requiresAction && sub.requiresAction !== 'No Action Required';
+  const hasAction = isActionable(sub);
 
   return (
     <div style={{ borderRadius: 4, marginBottom: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', borderLeft: hasAction ? '2px solid rgba(238,92,95,0.6)' : 'none' }}>
@@ -761,6 +767,7 @@ const HierarchySub = ({ sub, indicators, questions }) => {
             {sub.construct   != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Construct: {sub.construct}/5</span>}
             {sub.design      != null && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Design: {sub.design}/5</span>}
             {sub.approvedBy  && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Approved by: {sub.approvedBy}</span>}
+            {sub.assignedBy  && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>Assigned by: {sub.assignedBy}</span>}
           </div>
           {sub.notes && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 10 }}>{sub.notes}</div>}
           {/* Indicators */}
@@ -771,7 +778,7 @@ const HierarchySub = ({ sub, indicators, questions }) => {
                 {indicators.map(ind => (
                   <div key={ind.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, lineHeight: 1.4, wordBreak: 'break-word' }}>{ind.name}</span>
-                    {ind.requiresAction && ind.requiresAction !== 'No Action Required' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{ind.requiresAction}</span>}
+                    {isActionable(ind) && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{ind.requiresAction}</span>}
                     {ind.developedBy && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>{ind.developedBy}</span>}
                     <a href={ind.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
                   </div>
@@ -787,7 +794,7 @@ const HierarchySub = ({ sub, indicators, questions }) => {
                 {questions.map(q => (
                   <div key={q.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', flex: 1, minWidth: 0, lineHeight: 1.4, wordBreak: 'break-word' }}>{q.name}</span>
-                    {q.requiresAction && q.requiresAction !== 'No Action Required' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{q.requiresAction}</span>}
+                    {isActionable(q) && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 2, background: 'rgba(238,92,95,0.2)', color: '#ffa0a2', flexShrink: 0, whiteSpace: 'nowrap' }}>{q.requiresAction}</span>}
                     <a href={q.url} target="_blank" rel="noreferrer" style={{ fontSize: 10, color: 'rgba(255,255,255,0.25)', textDecoration: 'none', flexShrink: 0 }}>↗</a>
                   </div>
                 ))}
@@ -806,7 +813,7 @@ const HierarchySub = ({ sub, indicators, questions }) => {
 // Theme row — expandable, contains sub-themes
 const HierarchyTheme = ({ theme, subthemes, indsBySubtheme, qsBySubtheme }) => {
   const [open, setOpen] = useState(false);
-  const actionCount = subthemes.filter(s => s.requiresAction && s.requiresAction !== 'No Action Required').length;
+  const actionCount = subthemes.filter(isActionable).length;
   const indTotal = subthemes.reduce((n, s) => n + (indsBySubtheme.get(s.id) || []).length, 0);
   const qTotal   = subthemes.reduce((n, s) => n + (qsBySubtheme.get(s.id)   || []).length, 0);
 
@@ -988,7 +995,7 @@ const Search = ({ data }) => {
           <div style={{ maxHeight: 620, overflowY: 'auto' }}>
           {results.map((r, i) => {
             const col = DB_COLORS[r.db] || C.muted;
-            const hasAction = r.requiresAction && r.requiresAction !== "No Action Required";
+            const hasAction = isActionable(r);
             return (
               <div key={r.id + i} style={{ background: C.white, borderRadius: 6, marginBottom: 8, borderLeft: `4px solid ${col}`, border: `1px solid ${C.cloud}`, borderLeftWidth: 4, borderLeftColor: col, borderLeftStyle: "solid" }}>
                 <div style={{ padding: "12px 16px" }}>
@@ -1002,6 +1009,7 @@ const Search = ({ data }) => {
                     {r.status && <span style={{ fontSize: 11, color: C.muted }}>{r.status}</span>}
                     {hasAction && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: C.coral + "18", color: C.coral }}>{r.requiresAction}</span>}
                     {r.actionNeededBy.length > 0 && <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 2, background: r.actionNeededBy.includes("Kate") ? C.amber + "22" : C.olive + "22", color: r.actionNeededBy.includes("Kate") ? C.amber : C.olive }}>{r.actionNeededBy.join(', ')}</span>}
+                    {r.assignedBy && <span style={{ fontSize: 10, color: C.dim }}>Assigned by: {r.assignedBy}</span>}
                     {r.deadline && <span style={{ fontSize: 10, color: isOver(r.deadline) ? C.coral : C.dim, fontWeight: isOver(r.deadline) ? 700 : 400 }}>{isOver(r.deadline) ? "⚠ Overdue: " : "Due: "}{r.deadline}</span>}
                   </div>
                   {r.notes && <div style={{ marginTop: 8, fontSize: 12, color: C.muted, lineHeight: 1.5, paddingTop: 8, borderTop: `1px solid ${C.cloud}` }}>{r.notes.length > 220 ? r.notes.slice(0, 220) + "…" : r.notes}</div>}
@@ -1024,7 +1032,7 @@ const Velocity = ({ data }) => {
       <Card title="Completion by DB Level">
         {dbs.map(db => {
           const items = data.filter(r => r.db === db);
-          const done = items.filter(r => !r.requiresAction || r.requiresAction === "No Action Required").length;
+          const done = items.filter(r => !isActionable(r)).length;
           const total = items.length || 1;
           const pct = Math.round(done / total * 100);
           return <div key={db} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${C.cloud}` }}>
@@ -1341,6 +1349,7 @@ function App() {
   const [workMode, setWorkModeState] = useState("ALL");
   const [vFilter, setVFilter] = useState("ALL");
   const [oFilter, setOFilter] = useState("ALL");
+  const [assignedByFilter, setAssignedByFilter] = useState("ALL");
   const [batchSize, setBatchSize] = useState(10);
   const [syncMsg, setSyncMsg] = useState("Loading…");
   const [allData, setAllData] = useState(normItems(SEED_DATA));
@@ -1384,14 +1393,25 @@ function App() {
     return ['ALL', ...merged];
   }, [allData]);
 
+  const assignedByOptions = useMemo(() => {
+    const fromData = allData.map(r => r.assignedBy).filter(Boolean);
+    const merged = [...new Set([...NAMED_OWNERS, ...fromData])].sort();
+    return ['ALL', ...merged];
+  }, [allData]);
+
   // Reset oFilter if the current value is no longer in the live data options
   React.useEffect(() => {
     if (oFilter !== 'ALL' && !ownerOptions.includes(oFilter)) setOFilter('ALL');
   }, [ownerOptions]);
 
+  React.useEffect(() => {
+    if (assignedByFilter !== 'ALL' && !assignedByOptions.includes(assignedByFilter)) setAssignedByFilter('ALL');
+  }, [assignedByOptions]);
+
   const filtered = allData.filter(r =>
     (vFilter === "ALL" || (Array.isArray(r.vertical) && r.vertical.includes(vFilter))) &&
     (oFilter === "ALL" || r.actionNeededBy.includes(oFilter)) &&
+    (assignedByFilter === "ALL" || r.assignedBy === assignedByFilter) &&
     (workMode === "ALL" || r.db === workMode)
   );
 
@@ -1414,7 +1434,7 @@ function App() {
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            {[["Vertical", ["ALL", "RfC", "RfN", "C4C"], vFilter, setVFilter], ["Owner", ownerOptions, oFilter, setOFilter]].map(([label, opts, val, set]) => (
+            {[["Vertical", ["ALL", "RfC", "RfN", "C4C"], vFilter, setVFilter], ["Action Needed By", ownerOptions, oFilter, setOFilter], ["Assigned by", assignedByOptions, assignedByFilter, setAssignedByFilter]].map(([label, opts, val, set]) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
                 <select value={val} onChange={e => set(e.target.value)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
