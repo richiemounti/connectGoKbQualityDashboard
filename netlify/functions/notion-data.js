@@ -6,6 +6,7 @@ const DATABASES = {
   'Sub-themes': '30a60bfb-014e-80fd-bf3d-ca01d7f171b3',
   Indicators: '30a60bfb-014e-806f-8e3a-db04271bfcdf',
   Questions: '30a60bfb-014e-8042-a72c-c6c14c2ef065',
+  Standards: '37360bfb-014e-8028-a72d-e70f0ededb49',
 };
 
 // Retry tuning. 3 retries with exponential backoff (400ms, 800ms, 1600ms)
@@ -58,6 +59,10 @@ function extractStatus(prop) {
   return prop?.status?.name ?? null;
 }
 
+function extractOption(prop) {
+  return prop?.select?.name ?? prop?.status?.name ?? null;
+}
+
 function extractDate(prop) {
   return prop?.date?.start ?? null;
 }
@@ -68,6 +73,15 @@ function extractRichText(prop) {
 
 function extractTitle(prop) {
   return prop?.title?.map(t => t.plain_text).join('') || null;
+}
+
+function extractNumber(prop) {
+  return prop?.number === null || prop?.number === undefined ? null : String(prop.number);
+}
+
+function extractFileUrl(prop) {
+  const first = prop?.files?.[0];
+  return first?.file?.url ?? first?.external?.url ?? prop?.url ?? null;
 }
 
 function extractRelationFirst(prop) {
@@ -319,6 +333,33 @@ function mapPage(page, dbName) {
       themeId: null,
       subthemeId: extractRelationFirst(props['Subtheme']),
       parentIndicatorId: extractRelationFirst(props['Indicator database']),
+    };
+  }
+
+  if (dbName === 'Standards') {
+    const descriptor = getProperty(props, 'Descriptor');
+    return {
+      id, db: 'Standards', url,
+      name: extractTitle(descriptor),
+      status: extractOption(getProperty(props, 'Status')),
+      vertical: [],
+      requiresAction: null,
+      actionNeededBy: [],
+      assignedBy: null,
+      deadline: extractDate(getProperty(props, 'Due Review')),
+      standardProgram: extractOption(getProperty(props, 'Standard Programs')),
+      version: extractNumber(getProperty(props, 'Version')) || extractRichText(getProperty(props, 'Version')),
+      methodologies: extractMultiSelect(getProperty(props, 'Methodologies')),
+      reviewedDocuments: extractMultiSelect(getProperty(props, 'Reviewed Documents')),
+      reviewer: extractPeopleNames(getProperty(props, 'Reviewer')),
+      startDate: extractDate(getProperty(props, 'Start Date')),
+      dueReview: extractDate(getProperty(props, 'Due Review')),
+      completionDate: extractDate(getProperty(props, 'Completion Date')),
+      documentUrl: extractFileUrl(getProperty(props, 'Link to Document')),
+      standardsBodyUrl: extractRelationFirst(getProperty(props, 'Standards Bodies')) || extractFileUrl(getProperty(props, 'Standards Bodies')),
+      themeId: null,
+      subthemeId: null,
+      parentIndicatorId: null,
     };
   }
 
