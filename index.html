@@ -75,7 +75,7 @@ JSON RESPONSE SCHEMA (array of objects):
   [
     {
       "id":              string,   // Notion page URL (unique)
-      "db":              string,   // "Themes" | "Sub-themes" | "Indicators" | "Questions"
+      "db":              string,   // "Themes" | "Sub-themes" | "Indicators" | "Questions" | "Standards"
       "name":            string,   // item title
       "url":             string,   // full Notion page URL
       "status":          string,   // status field value
@@ -187,6 +187,10 @@ const SEED_DATA = [
   { id: "q6", db: "Questions", name: "In the past school term, did you speak with a teacher or school staff member about how your child is getting on with their learning?", themeId: "c4c-ce", vertical: "C4C", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 3, design: 2, notes: "Currently uses hypothetical framing ('would you speak'). Rewrite to retrospective ('did you speak'). Also missing Indicator link.", url: "https://app.notion.com/p/32060bfb014e8089a731dc9c8d6e6db6" },
 ];
 
+// Read-only local preview data, extracted from the Carbon Standards export.
+// Netlify replaces it with live Notion records whenever the function is available.
+const STANDARDS_PREVIEW_DATA = [{"id":"standard-19","db":"Standards","name":"Plan Vivo: PV Nature: Methodology & Data Protocol: 2025","status":"Not started","standardProgram":"PV Nature","version":"1.2","reviewer":"","documentUrl":"https://s3.eu-west-2.amazonaws.com/assets.planvivo.org/documents/PV-Nature-Documents/PV-Nature_Methodology-Data-Protocol_V1.2_2026-04-29-123312_crld.pdf"},{"id":"standard-22","db":"Standards","name":"Gold Standard: Principles and Requirements: 2025","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2025","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/standards/101_V2.1_PAR_Principles-Requirements.pdf"},{"id":"standard-17","db":"Standards","name":"Verra: VCS: Program Standard: v5.0","status":"Not started","standardProgram":"Verified Carbon Standards (VCS)","version":"5","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2025/12/VCS-Standard-v5.0.pdf"},{"id":"standard-16","db":"Standards","name":"Verra: JNR REDD+: Program Guide: v4.1","status":"Not started","standardProgram":"JNR REDD+","version":"4.1","reviewer":"","documentUrl":"https://verra.org/programs/jurisdictional-nested-redd-framework/jnr-program-details/"},{"id":"standard-18","db":"Standards","name":"Plan Vivo: PV Nature: Project Requirements: 2025","status":"Not started","standardProgram":"PV Nature","version":"1.1","reviewer":"","documentUrl":"https://s3.eu-west-2.amazonaws.com/assets.planvivo.org/documents/PV-Nature-Documents/PV-Nature_Project-Requirements_V.1.1.pdf"},{"id":"standard-15","db":"Standards","name":"Verra: VCS: Program Standard: v4.7","status":"Not started","standardProgram":"Verified Carbon Standards (VCS)","version":"4.7","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/04/VCS-Standard-v4.7-FINAL-4.15.24.pdf"},{"id":"standard-21","db":"Standards","name":"Gold Standard: SDG Impact Tool: Monitoring Indicator Requirements: 2025","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2025","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/118_par_requirements-for-monitoring-indicator-selection/"},{"id":"standard-20","db":"Standards","name":"Gold Standard: Gender Equality Requirements & Guidelines: 2025","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2025","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/104-par-gender-equality-requirements-and-guidelines/"},{"id":"standard-27","db":"Standards","name":"W+ Standard: Domain — Income & Assets: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-30","db":"Standards","name":"W+ Standard: Domain — Health: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-25","db":"Standards","name":"W+ Standard: Validation & Verification Requirements: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2025/02/Guidance-Document-for-Validation-and-Verification-Bodies-VVBs-of-the-W-Standard-.pdf"},{"id":"standard-29","db":"Standards","name":"W+ Standard: Domain — Leadership: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-24","db":"Standards","name":"W+ Standard: Domains & Indicators Methodology: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/"},{"id":"standard-32","db":"Standards","name":"W+ Standard: Domain — Mobility: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-28","db":"Standards","name":"W+ Standard: Domain — Education & Knowledge: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-26","db":"Standards","name":"W+ Standard: Domain — Time: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-31","db":"Standards","name":"W+ Standard: Domain — Food Security: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-23","db":"Standards","name":"W+ Standard: Standard: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-41","db":"Standards","name":"Equitable Earth: Programme Rules","status":"Not started","standardProgram":"Equitable Earth","version":"","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-37","db":"Standards","name":"Equitable Earth: FPIC Guidelines: v1","status":"Not started","standardProgram":"Equitable Earth","version":"1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-43","db":"Standards","name":"Verra: CCB: Program Rules: v3.1","status":"Not started","standardProgram":"CCB Standards","version":"3.1","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/07/CCB-Program-Rules-v3.1.pdf"},{"id":"standard-36","db":"Standards","name":"Equitable Earth: Safeguarding Declaration Matrix: v1.1","status":"Not started","standardProgram":"Equitable Earth","version":"1.1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-52","db":"Standards","name":"Fairtrade Climate Standard: Carbon Credits Requirements for Producers & Traders","status":"Not started","standardProgram":"Fairtrade Climate Standard","version":"","reviewer":"","documentUrl":""},{"id":"standard-45","db":"Standards","name":"Gold Standard: Safeguarding Principles & Requirements: 2023","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2023","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/standards/103_V1.2_PAR_Safeguarding-Principles-Requirements.pdf"},{"id":"standard-38","db":"Standards","name":"Equitable Earth: CSR Policy: v1","status":"Not started","standardProgram":"Equitable Earth","version":"1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-40","db":"Standards","name":"Equitable Earth: SDG Contribution Toolkit: v1.1","status":"Not started","standardProgram":"Equitable Earth","version":"1.1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-47","db":"Standards","name":"Gold Standard: Claims Guidelines: 2022","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2022","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/105-par-claims-guidelines/"},{"id":"standard-46","db":"Standards","name":"Gold Standard: Site Visit and Remote Audit Requirements: 2023","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2023","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/112_par_site-visit-and-remote-audit-requirements-and-procedures/"},{"id":"standard-39","db":"Standards","name":"Equitable Earth: Core Programme Manual: v1.2","status":"Not started","standardProgram":"Equitable Earth","version":"1.2","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-50","db":"Standards","name":"VCMI: Access Strategies Toolkit","status":"Not started","standardProgram":"VCMI","version":"","reviewer":"","documentUrl":""},{"id":"standard-35","db":"Standards","name":"Equitable Earth: Livelihood Matrix (2022): v1","status":"Not started","standardProgram":"Equitable Earth","version":"1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-1"},{"id":"standard-34","db":"Standards","name":"Equitable Earth: Livelihood Matrix: v1.1","status":"Not started","standardProgram":"Equitable Earth","version":"1.1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-49","db":"Standards","name":"VCMI: Monitoring Reporting & Assurance Framework","status":"Not started","standardProgram":"VCMI","version":"","reviewer":"","documentUrl":""},{"id":"standard-42","db":"Standards","name":"Verra: CCB: Program Standards: v3.1","status":"Not started","standardProgram":"CCB Standards","version":"3.1","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/07/CCB-Standards-v3.1_ENG.pdf"},{"id":"standard-44","db":"Standards","name":"Gold Standard: Stakeholder Consultation & Engagement Requirements: 2022","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2022","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/102-par-stakeholder-consultation-requirements/"},{"id":"standard-51","db":"Standards","name":"Fairtrade Climate Standard: Standard","status":"Not started","standardProgram":"Fairtrade Climate Standard","version":"","reviewer":"","documentUrl":""},{"id":"standard-33","db":"Standards","name":"Equitable Earth: Core Programme Document: v1.2","status":"Not started","standardProgram":"Equitable Earth","version":"1.2","reviewer":"","documentUrl":"https://docs.eq-earth.com/equitable-earth-standard-v1.2.pdf"},{"id":"standard-48","db":"Standards","name":"VCMI: Claims Code of Practice","status":"Not started","standardProgram":"VCMI","version":"","reviewer":"","documentUrl":""},{"id":"standard-57","db":"Standards","name":"OxCarbon: Public Consultation Policy","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/04/Public-Consultation-4.pdf"},{"id":"standard-64","db":"Standards","name":"CAR: Program Manual","status":"Not started","standardProgram":"CAR","version":"9","reviewer":"","documentUrl":"https://www.climateactionreserve.org/wp-content/uploads/2023/11/ROPM-Version-9.0-November-2023.pdf"},{"id":"standard-60","db":"Standards","name":"OxCarbon: Grievance Policy","status":"Not started","standardProgram":"","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/03/Grievance-Policy-2.pdf"},{"id":"standard-55","db":"Standards","name":"OxCarbon: General Guidance for ARR Projects","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2023/07/OxCarbon-General-Guide-for-Afforestation-Reforestation-and-Restoration-Projects.pdf"},{"id":"standard-59","db":"Standards","name":"OxCarbon: Whistle-Blowing Policy","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/04/Whsitleblowing-4.pdf"},{"id":"standard-61","db":"Standards","name":"ACR: Standard","status":"Not started","standardProgram":"ACR","version":"8","reviewer":"","documentUrl":"https://acrcarbon.org/wp-content/uploads/2023/10/ACR-Standard-v8.0.pdf"},{"id":"standard-54","db":"Standards","name":"OxCarbon: Oxford Principles for Net Zero Aligned Carbon Offsetting: 2024","status":"Not started","standardProgram":"OxCarbon","version":"2024","reviewer":"","documentUrl":"https://www.smithschool.ox.ac.uk/sites/default/files/2024-02/Oxford-Principles-for-Net-Zero-Aligned-Carbon-Offsetting-revised-2024.pdf"},{"id":"standard-63","db":"Standards","name":"ACR: Nature-Based Solutions Requirements","status":"Not started","standardProgram":"ACR","version":"","reviewer":"","documentUrl":"https://acrcarbon.org/acr-program/"},{"id":"standard-67","db":"Standards","name":"BioCarbon Registry: Methodologies","status":"Not started","standardProgram":"BioCarbon Registry","version":"","reviewer":"","documentUrl":"https://biocarbonstandard.com/"},{"id":"standard-58","db":"Standards","name":"OxCarbon: Anti-Corruption Policy","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/03/Anti-Corruption-Policy.pdf"},{"id":"standard-65","db":"Standards","name":"CAR: Verification Program Manual","status":"Not started","standardProgram":"CAR","version":"","reviewer":"","documentUrl":"https://climateactionreserve.org/how/program-resources/program-manual/"},{"id":"standard-62","db":"Standards","name":"ACR: Validation and Verification Standard","status":"Not started","standardProgram":"ACR","version":"","reviewer":"","documentUrl":"https://acrcarbon.org/wp-content/uploads/2023/09/2023.05.29-ACR-VV-Standard_V1.1_May-31-2018.pdf"},{"id":"standard-66","db":"Standards","name":"BioCarbon Registry: Standard — Program Rules","status":"Not started","standardProgram":"BioCarbon Registry","version":"2","reviewer":"","documentUrl":"https://biocarbonregistry.com/wp-content/uploads/2022/02/14.02.2022_BioCarbon-Registry-Standard-v2.0_en1.pdf"},{"id":"standard-56","db":"Standards","name":"OxCarbon: Practical Guidance for ARR Projects: v1","status":"Not started","standardProgram":"OxCarbon","version":"1","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/03/OXCarbon_Practical_Guidance_v1.0_Final-1.pdf"},{"id":"standard-53","db":"Standards","name":"OxCarbon: Principles-Based Standard: v1.6","status":"Not started","standardProgram":"OxCarbon","version":"1.6","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2023/05/OxCarbon-Guidelines-v1.6-Jan-2023.pdf"},{"id":"standard-76","db":"Standards","name":"CSI: European Biochar Certificate (EBC)","status":"Not started","standardProgram":"CSI / EBC","version":"","reviewer":"","documentUrl":""},{"id":"standard-71","db":"Standards","name":"GCC: Rules & Procedures","status":"Not started","standardProgram":"GCC","version":"","reviewer":"","documentUrl":""},{"id":"standard-74","db":"Standards","name":"Woodland Carbon Code (UK): Requirements","status":"Not started","standardProgram":"Woodland Carbon Code","version":"","reviewer":"","documentUrl":""},{"id":"standard-72","db":"Standards","name":"GCC: Approved Methodologies","status":"Not started","standardProgram":"GCC","version":"","reviewer":"","documentUrl":""},{"id":"standard-68","db":"Standards","name":"Puro Earth: Standard — General Rules","status":"Not started","standardProgram":"Puro Earth","version":"4.4","reviewer":"","documentUrl":"https://7518557.fs1.hubspotusercontent-na1.net/hubfs/7518557/Supplier%20Documents/General%20Rules%204_4.pdf"},{"id":"standard-75","db":"Standards","name":"Woodland Carbon Code (UK): Carbon Calculation Methodology","status":"Not started","standardProgram":"Woodland Carbon Code","version":"","reviewer":"","documentUrl":""},{"id":"standard-80","db":"Standards","name":"ICR: Standard","status":"Not started","standardProgram":"ICR","version":"","reviewer":"","documentUrl":""},{"id":"standard-73","db":"Standards","name":"Peatland Code (UK): Standard & Requirements","status":"Not started","standardProgram":"Peatland Code","version":"","reviewer":"","documentUrl":""},{"id":"standard-81","db":"Standards","name":"ICR: Methodologies","status":"Not started","standardProgram":"ICR","version":"","reviewer":"","documentUrl":""},{"id":"standard-70","db":"Standards","name":"Puro Earth: Auditing & Verification Rules","status":"Not started","standardProgram":"Puro Earth","version":"","reviewer":"","documentUrl":""},{"id":"standard-69","db":"Standards","name":"Puro Earth: Standard — Output Methodologies","status":"Not started","standardProgram":"Puro Earth","version":"","reviewer":"","documentUrl":""},{"id":"standard-79","db":"Standards","name":"UCR: Methodologies","status":"Not started","standardProgram":"UCR","version":"","reviewer":"","documentUrl":""},{"id":"standard-78","db":"Standards","name":"UCR: Standard","status":"Not started","standardProgram":"UCR","version":"","reviewer":"","documentUrl":""},{"id":"standard-77","db":"Standards","name":"CSI: Durable CDR Methodologies","status":"Not started","standardProgram":"CSI / EBC","version":"","reviewer":"","documentUrl":""},{"id":"standard-88","db":"Standards","name":"SocialCarbon: Capital — Financial: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-84","db":"Standards","name":"SocialCarbon: Methodology Requirements: v2.1","status":"Not started","standardProgram":"SOCIALCARBON","version":"2.1","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON-Methodology_Requirements_v21.pdf"},{"id":"standard-82","db":"Standards","name":"SocialCarbon: Standard Guide: v2.1","status":"Not started","standardProgram":"SOCIALCARBON","version":"2.1","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON-Standard_Guide_v21.pdf"},{"id":"standard-86","db":"Standards","name":"SocialCarbon: Capital — Human: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-89","db":"Standards","name":"SocialCarbon: Capital — Physical: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-83","db":"Standards","name":"SocialCarbon: Standard (Nature3): v7.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"7","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_Standard_v70.pdf"},{"id":"standard-90","db":"Standards","name":"SocialCarbon: Capital — Biodiversity: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-87","db":"Standards","name":"SocialCarbon: Capital — Social: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-85","db":"Standards","name":"SocialCarbon: Capital — Natural: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-91","db":"Standards","name":"Verra: CCB: Program Definitions","status":"Not started","standardProgram":"CCB Standards","version":"3","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/07/CCB_Program_Definitions_v3.0.pdf"}];
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const normVert = v => Array.isArray(v) ? v : (v == null || v === "" ? [] : [v]);
 // Retired records are intentionally excluded everywhere. A record still marked
@@ -202,6 +206,8 @@ const todayStr = () => new Date().toISOString().split('T')[0];
 const isOver = d => !!d && d < todayStr();
 const isWeek = d => { if (!d) return false; const t = todayStr(); const e = new Date(); e.setDate(e.getDate() + (7 - e.getDay())); const eStr = e.toISOString().split('T')[0]; return d >= t && d <= eStr; };
 const isDue = d => !!d && (isWeek(d) || isOver(d));
+const dateText = d => d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const monthText = d => d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 
 // ─── PEOPLE ───────────────────────────────────────────────────────────────────
 const PEOPLE = {
@@ -1343,6 +1349,194 @@ const Discrepancies = ({ discrepancies, allData, platformData }) => {
   );
 };
 
+// ─── STANDARDS REVIEW TAB ───────────────────────────────────────────────────
+const StandardsReview = ({ standards }) => {
+  const [view, setView] = useState('calendar');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [reviewerFilter, setReviewerFilter] = useState('ALL');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
+
+  const reviewWindows = standards.filter(r => r.startDate || r.dueReview);
+  const reviewerOptions = [...new Set(standards.map(r => r.reviewer).filter(Boolean))].sort();
+  const statusOptions = [...new Set(standards.map(r => r.status).filter(Boolean))].sort();
+  const scheduledCount = reviewWindows.length;
+  const completedCount = standards.filter(r => r.completionDate).length;
+  const reviewedCount = standards.filter(r => r.reviewer).length;
+
+  const filteredRows = standards
+    .filter(r => statusFilter === 'ALL' || r.status === statusFilter)
+    .filter(r => reviewerFilter === 'ALL' || r.reviewer === reviewerFilter)
+    .sort((a, b) => (a.dueReview || '9999-12-31').localeCompare(b.dueReview || '9999-12-31') || (a.name || '').localeCompare(b.name || ''));
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const rows = filteredRows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  useEffect(() => { setPage(0); }, [statusFilter, reviewerFilter]);
+  useEffect(() => { if (page >= totalPages) setPage(totalPages - 1); }, [page, totalPages]);
+
+  const [month, setMonth] = useState(() => {
+    const firstReview = reviewWindows.map(r => r.startDate || r.dueReview).sort()[0];
+    const base = firstReview ? new Date(`${firstReview}T12:00:00`) : new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
+
+  // A review can have both Start Date and Due Review. Build week-by-week
+  // segments so each review is rendered as a horizontal bar across its range,
+  // including ranges that cross a calendar-week boundary.
+  const calendar = useMemo(() => {
+    const toIso = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const startOffset = (month.getDay() + 6) % 7;
+    const calendarStart = new Date(month.getFullYear(), month.getMonth(), 1 - startOffset);
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const cellCount = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+    const days = Array.from({ length: cellCount }, (_, index) => {
+      const date = new Date(calendarStart.getFullYear(), calendarStart.getMonth(), calendarStart.getDate() + index);
+      return { date, iso: toIso(date), day: date.getDate(), inMonth: date.getMonth() === month.getMonth() };
+    });
+    const weeks = Array.from({ length: cellCount / 7 }, (_, index) => ({ days: days.slice(index * 7, index * 7 + 7), segments: [] }));
+    const calendarStartIso = days[0].iso;
+    const calendarEndIso = days[days.length - 1].iso;
+
+    standards.filter(record => record.startDate || record.dueReview).forEach(record => {
+      let start = record.startDate || record.dueReview;
+      let end = record.dueReview || record.startDate;
+      if (start > end) [start, end] = [end, start];
+      start = start < calendarStartIso ? calendarStartIso : start;
+      end = end > calendarEndIso ? calendarEndIso : end;
+      if (start > end) return;
+
+      weeks.forEach((week, weekIndex) => {
+        const weekStart = week.days[0].iso;
+        const weekEnd = week.days[6].iso;
+        if (end < weekStart || start > weekEnd) return;
+        const segmentStart = start > weekStart ? start : weekStart;
+        const segmentEnd = end < weekEnd ? end : weekEnd;
+        week.segments.push({
+          record,
+          start: week.days.findIndex(day => day.iso === segmentStart),
+          end: week.days.findIndex(day => day.iso === segmentEnd),
+          weekIndex,
+        });
+      });
+    });
+
+    weeks.forEach(week => {
+      const laneEnds = [];
+      week.segments.sort((a, b) => a.start - b.start || b.end - a.end).forEach(segment => {
+        let lane = laneEnds.findIndex(end => end < segment.start);
+        if (lane === -1) lane = laneEnds.length;
+        laneEnds[lane] = segment.end;
+        segment.lane = lane;
+      });
+      week.lanes = laneEnds.length;
+    });
+
+    return { weeks };
+  }, [month, standards]);
+  const statusStyle = status => status === 'Complete' || status === 'Completed'
+    ? { bg: 'rgba(133,135,85,0.15)', color: C.olive }
+    : status === 'Not started'
+      ? { bg: 'rgba(205,128,40,0.12)', color: '#8a4e10' }
+      : { bg: 'rgba(81,20,51,0.10)', color: C.plum };
+
+  if (standards.length === 0) return (
+    <Card title="Standards review">
+      <div style={{ padding: '22px 0', color: C.dim, fontSize: 13 }}>
+        No standards records are available yet. Share the Carbon Standards in the Platform database with the Notion integration, then sync.
+      </div>
+    </Card>
+  );
+
+  return <div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 16 }}>
+      <KPI val={standards.length} label="Standards" accent={C.forest} />
+      <KPI val={reviewedCount} label="Reviewer assigned" accent={C.plum} />
+      <KPI val={scheduledCount} label="Review windows set" accent={C.amber} />
+      <KPI val={completedCount} label="Completed" accent={C.olive} />
+    </div>
+
+    <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+      {[['Calendar', 'calendar'], ['Standards register', 'register']].map(([label, value]) => (
+        <button key={value} onClick={() => setView(value)} style={{ padding: '6px 12px', borderRadius: 4, border: `1px solid ${view === value ? C.forest : C.cloud}`, background: view === value ? C.forest : C.white, color: view === value ? C.white : C.muted, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</button>
+      ))}
+    </div>
+
+    {view === 'calendar' && (
+      <Card title="Review calendar" sub="Dates use the Due Review property in Notion">
+        {reviewWindows.length === 0 ? (
+          <div style={{ padding: '20px 0', color: C.dim, fontSize: 13 }}>No review start or due dates have been set.</div>
+        ) : <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} style={{ border: `1px solid ${C.cloud}`, background: C.white, color: C.forest, padding: '4px 9px', borderRadius: 3, fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer' }}>←</button>
+            <span style={{ fontWeight: 700, color: C.forest, fontSize: 15 }}>{monthText(month)}</span>
+            <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} style={{ border: `1px solid ${C.cloud}`, background: C.white, color: C.forest, padding: '4px 9px', borderRadius: 3, fontFamily: 'inherit', fontWeight: 700, cursor: 'pointer' }}>→</button>
+          </div>
+          <div style={{ borderTop: `1px solid ${C.cloud}`, borderLeft: `1px solid ${C.cloud}` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <div key={day} style={{ padding: '7px', background: C.off, borderRight: `1px solid ${C.cloud}`, borderBottom: `1px solid ${C.cloud}`, fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: '0.07em', textTransform: 'uppercase' }}>{day}</div>)}
+            </div>
+            {calendar.weeks.map((week, weekIndex) => <div key={weekIndex} style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', minHeight: Math.max(92, 34 + week.lanes * 24), borderBottom: `1px solid ${C.cloud}` }}>
+              {week.days.map(day => <div key={day.iso} style={{ padding: 7, borderRight: `1px solid ${C.cloud}`, background: day.inMonth ? C.white : '#faf9f6' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: day.inMonth ? C.muted : C.cloud }}>{day.day}</div>
+              </div>)}
+              <div style={{ position: 'absolute', top: 28, left: 0, right: 0, display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gridAutoRows: 20, gap: '3px 0', pointerEvents: 'none' }}>
+                {week.segments.map(segment => {
+                  const target = segment.record.url || segment.record.documentUrl;
+                  const Tag = target ? 'a' : 'div';
+                  return <Tag key={`${segment.record.id}-${weekIndex}`} href={target || undefined} target={target ? '_blank' : undefined} rel={target ? 'noreferrer' : undefined} title={`${segment.record.name} · ${dateText(segment.record.startDate || segment.record.dueReview)} – ${dateText(segment.record.dueReview || segment.record.startDate)}`} style={{ gridColumn: `${segment.start + 1} / ${segment.end + 2}`, gridRow: segment.lane + 1, margin: '0 3px', padding: '3px 6px', borderRadius: 2, background: C.amber + '22', borderLeft: `3px solid ${C.amber}`, color: '#7a4c13', fontSize: 10, fontWeight: 700, lineHeight: 1.2, textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', pointerEvents: target ? 'auto' : 'none' }}>{segment.record.name}</Tag>;
+                })}
+              </div>
+            </div>)}
+          </div>
+        </>}
+      </Card>
+    )}
+
+    {view === 'register' && <Card title="Standards register" sub={`${filteredRows.length} matching records`}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+        <label style={{ fontSize: 11, color: C.dim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Status&nbsp;
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ marginLeft: 4, padding: '4px 7px', border: `1px solid ${C.cloud}`, borderRadius: 3, background: C.white, color: C.forest, fontFamily: 'inherit' }}>
+            <option value="ALL">All</option>{statusOptions.map(value => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+        <label style={{ fontSize: 11, color: C.dim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Reviewer&nbsp;
+          <select value={reviewerFilter} onChange={e => setReviewerFilter(e.target.value)} style={{ marginLeft: 4, padding: '4px 7px', border: `1px solid ${C.cloud}`, borderRadius: 3, background: C.white, color: C.forest, fontFamily: 'inherit' }}>
+            <option value="ALL">All</option>{reviewerOptions.map(value => <option key={value} value={value}>{value}</option>)}
+          </select>
+        </label>
+      </div>
+      <div style={{ overflowX: 'auto', border: `1px solid ${C.cloud}`, borderRadius: 5 }}>
+        <div style={{ minWidth: 920 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(250px,2.2fr) 1fr 0.55fr 1fr 0.9fr 1fr 44px', gap: 12, padding: '9px 12px', background: C.off, borderBottom: `1px solid ${C.cloud}` }}>
+            {['Descriptor', 'Standard program', 'Version', 'Reviewer', 'Due review', 'Status', ''].map((heading, i) => <span key={`${heading}-${i}`} style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{heading}</span>)}
+          </div>
+          {rows.map((record, index) => {
+            const style = statusStyle(record.status);
+            return <div key={record.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(250px,2.2fr) 1fr 0.55fr 1fr 0.9fr 1fr 44px', gap: 12, padding: '11px 12px', alignItems: 'center', borderBottom: index < rows.length - 1 ? `1px solid ${C.cloud}` : 'none', background: index % 2 ? '#faf9f6' : C.white }}>
+              <div style={{ minWidth: 0 }}><span style={{ display: 'block', color: C.forest, fontSize: 13, fontWeight: 600, lineHeight: 1.25 }}>{record.name || '—'}</span>{record.methodologies?.length > 0 && <span style={{ display: 'block', marginTop: 4, color: C.dim, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.methodologies.slice(0, 2).join(' · ')}{record.methodologies.length > 2 ? ` +${record.methodologies.length - 2}` : ''}</span>}</div>
+              <span style={{ color: C.muted, fontSize: 12 }}>{record.standardProgram || '—'}</span>
+              <span style={{ color: C.muted, fontSize: 12 }}>{record.version || '—'}</span>
+              <span style={{ color: C.muted, fontSize: 12 }}>{record.reviewer || '—'}</span>
+              <span style={{ color: record.dueReview && isOver(record.dueReview) ? C.coral : C.muted, fontSize: 12, fontWeight: record.dueReview && isOver(record.dueReview) ? 700 : 400 }}>{dateText(record.dueReview)}</span>
+              <span style={{ justifySelf: 'start', padding: '2px 6px', borderRadius: 3, background: style.bg, color: style.color, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>{record.status || '—'}</span>
+              <div style={{ display: 'flex', gap: 7, justifyContent: 'flex-end' }}>
+                {record.documentUrl && <a href={record.documentUrl} target="_blank" rel="noreferrer" title="Open source document" style={{ color: C.amber, fontSize: 13, textDecoration: 'none' }}>↗</a>}
+                {record.url && <a href={record.url} target="_blank" rel="noreferrer" title="Open in Notion" style={{ color: C.forest, fontSize: 13, textDecoration: 'none' }}>↗</a>}
+              </div>
+            </div>;
+          })}
+          {rows.length === 0 && <div style={{ padding: '22px 12px', color: C.dim, fontSize: 13 }}>No standards match these filters.</div>}
+        </div>
+      </div>
+      {filteredRows.length > PAGE_SIZE && <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+        <button disabled={page === 0} onClick={() => setPage(page - 1)} style={{ padding: '4px 9px', border: `1px solid ${C.cloud}`, background: C.white, color: C.forest, borderRadius: 3, fontFamily: 'inherit', cursor: page === 0 ? 'not-allowed' : 'pointer', opacity: page === 0 ? 0.45 : 1 }}>Previous</button>
+        <span style={{ fontSize: 11, color: C.dim }}>Page {page + 1} of {totalPages}</span>
+        <button disabled={page === totalPages - 1} onClick={() => setPage(page + 1)} style={{ padding: '4px 9px', border: `1px solid ${C.cloud}`, background: C.white, color: C.forest, borderRadius: 3, fontFamily: 'inherit', cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer', opacity: page === totalPages - 1 ? 0.45 : 1 }}>Next</button>
+      </div>}
+    </Card>}
+  </div>;
+};
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [tab, setTab] = useState("overview");
@@ -1352,7 +1546,7 @@ function App() {
   const [assignedByFilter, setAssignedByFilter] = useState("ALL");
   const [batchSize, setBatchSize] = useState(10);
   const [syncMsg, setSyncMsg] = useState("Loading…");
-  const [allData, setAllData] = useState(normItems(SEED_DATA));
+  const [allData, setAllData] = useState(normItems([...SEED_DATA, ...STANDARDS_PREVIEW_DATA]));
   const [platformData, setPlatformData] = useState(null);
   const [dbCounts, setDbCounts] = useState(null);
   const [syncing, setSyncing] = useState(false);
@@ -1376,7 +1570,7 @@ function App() {
       })
       .catch(error => {
         const isLocalPreview = window.location.protocol === "file:";
-        setAllData(isLocalPreview ? normItems(SEED_DATA) : []);
+        setAllData(isLocalPreview ? normItems([...SEED_DATA, ...STANDARDS_PREVIEW_DATA]) : []);
         setDbCounts(null);
         setSyncMsg(isLocalPreview
           ? "Local preview · deploy to use live Notion data"
@@ -1391,21 +1585,27 @@ function App() {
   };
 
   useEffect(() => { fetchData(); }, []);
-  const discrepancies = useMemo(() => computeDiscrepancies(allData, platformData), [allData, platformData]);
+  // Standards are deliberately separate from the KB quality workflow. They
+  // have their own review calendar and register rather than changing KB counts.
+  const kbData = useMemo(() => allData.filter(r => r.db !== 'Standards'), [allData]);
+  const standardsData = useMemo(() => allData.filter(r => r.db === 'Standards'), [allData]);
+  const discrepancies = useMemo(() => computeDiscrepancies(kbData, platformData), [kbData, platformData]);
 
   // Derive owner options: always include NAMED_OWNERS as a baseline,
   // plus anyone else found in live data (e.g. new people added in Notion)
   const ownerOptions = useMemo(() => {
-    const fromData = allData.flatMap(r => r.actionNeededBy).filter(Boolean);
+    const fromData = kbData.flatMap(r => r.actionNeededBy).filter(Boolean);
     const merged = [...new Set([...NAMED_OWNERS, ...fromData])].sort();
     return ['ALL', ...merged];
-  }, [allData]);
+  }, [kbData]);
 
   const assignedByOptions = useMemo(() => {
-    const fromData = allData.map(r => r.assignedBy).filter(Boolean);
+    const fromData = kbData.map(r => r.assignedBy).filter(Boolean);
+    // Keep the dropdown grounded in the live data: a person appears only when
+    // at least one visible item has that Assigned by value.
     const merged = [...new Set(fromData)].sort();
     return ['ALL', ...merged];
-  }, [allData]);
+  }, [kbData]);
 
   // Reset oFilter if the current value is no longer in the live data options
   React.useEffect(() => {
@@ -1416,15 +1616,15 @@ function App() {
     if (assignedByFilter !== 'ALL' && !assignedByOptions.includes(assignedByFilter)) setAssignedByFilter('ALL');
   }, [assignedByOptions]);
 
-  const filtered = allData.filter(r =>
+  const filtered = kbData.filter(r =>
     (vFilter === "ALL" || (Array.isArray(r.vertical) && r.vertical.includes(vFilter))) &&
     (oFilter === "ALL" || r.actionNeededBy.includes(oFilter)) &&
     (assignedByFilter === "ALL" || r.assignedBy === assignedByFilter) &&
     (workMode === "ALL" || r.db === workMode)
   );
 
-  const TABS = ["overview", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "discrepancies"];
-  const TAB_LABELS = { overview: "Overview", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Models", discrepancies: "⚠ Sync Gaps" };
+  const TABS = ["overview", "standards", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "discrepancies"];
+  const TAB_LABELS = { overview: "Overview", standards: "Standards Review", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Models", discrepancies: "⚠ Sync Gaps" };
   const MODES = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
 
   const headerBtn = (label, onClick, active) => (
@@ -1445,7 +1645,7 @@ function App() {
             {[["Vertical", ["ALL", "RfC", "RfN", "C4C"], vFilter, setVFilter], ["Action Needed By", ownerOptions, oFilter, setOFilter], ["Assigned by", assignedByOptions, assignedByFilter, setAssignedByFilter]].map(([label, opts, val, set]) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase" }}>{label}</span>
-                <select value={val} onChange={e => set(e.target.value)} disabled={label === "Assigned by" && opts.length === 1} title={label === "Assigned by" && opts.length === 1 ? "Assigned by values appear when live Notion data is loaded." : undefined} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: label === "Assigned by" && opts.length === 1 ? "not-allowed" : "pointer", outline: "none", opacity: label === "Assigned by" && opts.length === 1 ? 0.55 : 1 }}>
+                <select value={val} onChange={e => set(e.target.value)} style={{ padding: "6px 10px", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 6, background: "rgba(255,255,255,0.08)", color: C.white, fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none" }}>
                   {opts.map(o => <option key={o} value={o} style={{ background: C.forest, color: C.white }}>{o}</option>)}
                 </select>
               </div>
@@ -1509,7 +1709,8 @@ function App() {
 
       {/* CONTENT */}
       <div style={{ padding: "24px 32px", maxWidth: 1500, margin: "0 auto" }}>
-        {tab === "overview" && <Overview filtered={filtered} discrepancies={discrepancies} allData={allData} />}
+        {tab === "overview" && <Overview filtered={filtered} discrepancies={discrepancies} allData={kbData} />}
+        {tab === "standards" && <StandardsReview standards={standardsData} />}
         {tab === "today" && <Today filtered={filtered} batchSize={batchSize} />}
         {tab === "pipeline" && <Pipeline filtered={filtered} />}
         {tab === "quality" && <Quality filtered={filtered} />}
@@ -1517,7 +1718,7 @@ function App() {
         {tab === "search" && <Search data={filtered} />}
         {tab === "velocity" && <Velocity data={filtered} />}
         {tab === "platform" && <Platform data={platformData} />}
-        {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={allData} platformData={platformData} />}
+        {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={kbData} platformData={platformData} />}
       </div>
 
       {/* FOOTER */}
