@@ -230,6 +230,7 @@ const PILL_STYLES = {
   "Awaiting Sign-off":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
   "Ready to Publish":          { bg: "rgba(17,48,42,0.08)",   color: C.forest },
   "Retire":                    { bg: "rgba(238,92,95,0.12)", color: "#901818" },
+  "Edit in Platform":          { bg: "rgba(78,124,168,0.12)", color: "#234e72" },
   "Discuss with Kate":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
   "Discuss with Hope":         { bg: "rgba(196,123,58,0.1)",  color: "#7a4000" },
   "Discuss with Hannah":       { bg: "rgba(78,124,168,0.1)",  color: "#234e72" },
@@ -273,7 +274,7 @@ const Card = ({ title, sub, children, mb }) => (
 );
 
 const ActionPill = ({ action }) => {
-  const labels = { "Complete Missing Fields": "Complete Fields", "Revise and Resubmit": "Revise", "Awaiting Sign-off": "Sign-off", "Ready to Publish": "Ready", "Retire": "Retire" };
+  const labels = { "Complete Missing Fields": "Complete Fields", "Revise and Resubmit": "Revise", "Awaiting Sign-off": "Sign-off", "Ready to Publish": "Ready", "Retire": "Retire", "Edit in Platform": "Platform Edit" };
   return <Pill label={action} />;
 };
 
@@ -353,6 +354,7 @@ const ACTION_COLORS = {
   'Awaiting Sign-off':       C.plum,
   'Ready to Publish':        C.forest,
   'Retire':                  C.coral,
+  'Edit in Platform':        '#4e7ca8',
 };
 const actionColor = k => {
   if (ACTION_COLORS[k]) return ACTION_COLORS[k];
@@ -446,6 +448,7 @@ const Overview = ({ filtered, discrepancies, allData }) => {
     { key: 'Revise and Resubmit',     color: C.coral,   owner: 'Belinda' },
     { key: 'Awaiting Sign-off',       color: C.plum,    owner: 'Kate' },
     { key: 'Ready to Publish',        color: C.forest,  owner: null },
+    { key: 'Edit in Platform',        color: '#4e7ca8', owner: null },
     { key: 'Retire',                  color: C.coral,   owner: null },
   ];
   // Dynamic discuss stages derived from live data
@@ -633,7 +636,7 @@ const Today = ({ filtered, batchSize }) => {
 
 // ─── PIPELINE TAB ─────────────────────────────────────────────────────────────
 const Pipeline = ({ filtered }) => {
-  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Sign-off", "Ready to Publish", "Retire"];
+  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Sign-off", "Ready to Publish", "Edit in Platform", "Retire"];
   const discussStages = [...new Set(filtered.map(r => r.requiresAction).filter(v => v && v.startsWith('Discuss with')))].sort();
   const allStages     = [...FIXED_STAGES, ...discussStages];
 
@@ -1126,12 +1129,15 @@ const PlatformCatalogueRow = ({ item, cols }) => (
   </div>
 );
 
-const Platform = ({ data }) => {
+const Platform = ({ data, error, loading }) => {
   const [catalogueTab, setCatalogueTab] = useState("standards");
 
-  if (!data) return <div style={{ padding: "40px 0", textAlign: "center", color: C.muted, fontStyle: "italic" }}>
-    Platform data unavailable — check that BACKEND_API_URL and KNOWLEDGEBASE_API_KEY are set in Netlify environment variables.
-  </div>;
+  if (!data) return <Card title="Platform hierarchy" sub="Published platform content">
+    <div style={{ padding: "16px 0", color: C.muted, fontSize: 13 }}>
+      <strong style={{ display: "block", color: C.forest, marginBottom: 6 }}>{loading ? "Loading platform hierarchy…" : "Platform hierarchy is unavailable."}</strong>
+      {!loading && <span>{error || "The Platform Models connection did not return data."}</span>}
+    </div>
+  </Card>;
 
   const { summary, themes = [], standards = [], sdgs = [], esgCategories = [], exportedAt } = data;
 
@@ -1226,16 +1232,17 @@ const Platform = ({ data }) => {
 };
 
 // ─── DISCREPANCIES TAB ───────────────────────────────────────────────────────
-const Discrepancies = ({ discrepancies, allData, platformData }) => {
+const Discrepancies = ({ discrepancies, allData, platformData, error, loading }) => {
   const [dbFilter, setDbFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [verticalFilter, setVerticalFilter] = useState('ALL');
 
-  if (!platformData) return (
-    <div style={{ textAlign: "center", padding: 60, color: C.dim, fontStyle: "italic" }}>
-      Backend not connected — set BACKEND_API_URL and KNOWLEDGEBASE_API_KEY to enable discrepancy detection.
+  if (!platformData) return <Card title="Sync gaps" sub="Notion records not yet present in the platform">
+    <div style={{ padding: "16px 0", color: C.muted, fontSize: 13 }}>
+      <strong style={{ display: "block", color: C.forest, marginBottom: 6 }}>{loading ? "Comparing records…" : "Sync comparison is unavailable."}</strong>
+      {!loading && <span>{error || "The Platform Models connection did not return data."}</span>}
     </div>
-  );
+  </Card>;
 
   const inScope  = r => Array.isArray(r.vertical) && r.vertical.some(v => IN_SCOPE_VERTICALS.includes(v));
   const inScopeQ = r => true; // Questions rollup unfixed → keep all in scope; change to the inScope form once fixed
@@ -1547,8 +1554,10 @@ function App() {
   const [batchSize, setBatchSize] = useState(10);
   const [syncMsg, setSyncMsg] = useState("Loading…");
   const [allData, setAllData] = useState(normItems([...SEED_DATA, ...STANDARDS_PREVIEW_DATA]));
-  const [platformData, setPlatformData] = useState(null);
   const [dbCounts, setDbCounts] = useState(null);
+  const [platformData, setPlatformData] = useState(null);
+  const [platformLoading, setPlatformLoading] = useState(true);
+  const [platformError, setPlatformError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -1578,10 +1587,22 @@ function App() {
       })
       .finally(() => setSyncing(false));
 
-    fetch("/.netlify/functions/backend-data", { cache: "no-store" })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    setPlatformLoading(true);
+    setPlatformError("");
+    fetch("/.netlify/functions/backend-data?includeAll=true", { cache: "no-store" })
+      .then(async r => {
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(payload.error || `Platform function returned ${r.status}`);
+        if (!payload || typeof payload !== "object") throw new Error("Platform function returned an invalid response");
+        return payload;
+      })
       .then(data => setPlatformData(data))
-      .catch(() => setPlatformData(null));
+      .catch(error => {
+        setPlatformData(null);
+        setPlatformError(error.message);
+      })
+      .finally(() => setPlatformLoading(false));
+
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -1623,8 +1644,8 @@ function App() {
     (workMode === "ALL" || r.db === workMode)
   );
 
-  const TABS = ["overview", "standards", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "discrepancies"];
-  const TAB_LABELS = { overview: "Overview", standards: "Standards Review", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Models", discrepancies: "⚠ Sync Gaps" };
+  const TABS = ["overview", "standards", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "gaps"];
+  const TAB_LABELS = { overview: "Overview", standards: "Standards Review", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Hierarchy", gaps: "Sync Gaps" };
   const MODES = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
 
   const headerBtn = (label, onClick, active) => (
@@ -1709,7 +1730,7 @@ function App() {
 
       {/* CONTENT */}
       <div style={{ padding: "24px 32px", maxWidth: 1500, margin: "0 auto" }}>
-        {tab === "overview" && <Overview filtered={filtered} discrepancies={discrepancies} allData={kbData} />}
+        {tab === "overview" && <Overview filtered={filtered} discrepancies={platformData ? discrepancies : null} allData={kbData} />}
         {tab === "standards" && <StandardsReview standards={standardsData} />}
         {tab === "today" && <Today filtered={filtered} batchSize={batchSize} />}
         {tab === "pipeline" && <Pipeline filtered={filtered} />}
@@ -1717,8 +1738,8 @@ function App() {
         {tab === "hierarchy" && <Hierarchy data={filtered} />}
         {tab === "search" && <Search data={filtered} />}
         {tab === "velocity" && <Velocity data={filtered} />}
-        {tab === "platform" && <Platform data={platformData} />}
-        {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={kbData} platformData={platformData} />}
+        {tab === "platform" && <Platform data={platformData} error={platformError} loading={platformLoading} />}
+        {tab === "gaps" && <Discrepancies discrepancies={discrepancies} allData={kbData} platformData={platformData} error={platformError} loading={platformLoading} />}
       </div>
 
       {/* FOOTER */}
