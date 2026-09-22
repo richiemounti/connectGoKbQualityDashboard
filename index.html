@@ -316,7 +316,6 @@ const ACTION_COLORS = {
   'Awaiting Sign-off':       C.plum,
   'Ready to Publish':        C.forest,
   'Retire':                  C.coral,
-  'Edit in Platform':        '#4e7ca8',
 };
 const actionColor = k => {
   if (ACTION_COLORS[k]) return ACTION_COLORS[k];
@@ -1421,8 +1420,8 @@ function App() {
   const [batchSize, setBatchSize] = useState(10);
   const [syncMsg, setSyncMsg] = useState("Loading…");
   const [allData, setAllData] = useState(normItems([...SEED_DATA, ...STANDARDS_PREVIEW_DATA]));
-  const [dbCounts, setDbCounts] = useState(null);
   const [platformData, setPlatformData] = useState(null);
+  const [dbCounts, setDbCounts] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const fetchData = () => {
@@ -1488,8 +1487,8 @@ function App() {
     (assignedByFilter === "ALL" || r.assignedBy === assignedByFilter) &&
     (workMode === "ALL" || r.db === workMode)
   );
-  const TABS = ["overview", "standards", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "gaps"];
-  const TAB_LABELS = { overview: "Overview", standards: "Standards Review", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Hierarchy", gaps: "Sync Gaps" };
+  const TABS = ["overview", "standards", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "discrepancies"];
+  const TAB_LABELS = { overview: "Overview", standards: "Standards Review", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Models", discrepancies: "⚠ Sync Gaps" };
   const MODES = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
   const headerBtn = (label, onClick, active) => (
     <button onClick={onClick} style={{ padding: "4px 12px", borderRadius: 3, fontSize: 11, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", background: active ? C.amber : "transparent", color: active ? C.white : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.12s" }}>{label}</button>
@@ -1569,7 +1568,7 @@ function App() {
       )}
       {/* CONTENT */}
       <div style={{ padding: "24px 32px", maxWidth: 1500, margin: "0 auto" }}>
-        {tab === "overview" && <Overview filtered={filtered} discrepancies={platformData ? discrepancies : null} allData={kbData} />}
+        {tab === "overview" && <Overview filtered={filtered} discrepancies={discrepancies} allData={kbData} />}
         {tab === "standards" && <StandardsReview standards={standardsData} />}
         {tab === "today" && <Today filtered={filtered} batchSize={batchSize} />}
         {tab === "pipeline" && <Pipeline filtered={filtered} />}
@@ -1578,7 +1577,7 @@ function App() {
         {tab === "search" && <Search data={filtered} />}
         {tab === "velocity" && <Velocity data={filtered} />}
         {tab === "platform" && <Platform data={platformData} />}
-        {tab === "gaps" && <Discrepancies discrepancies={discrepancies} allData={kbData} platformData={platformData} />}
+        {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={kbData} platformData={platformData} />}
       </div>
       {/* FOOTER */}
       <div style={{ padding: "12px 32px", fontSize: 11, color: "rgba(255,255,255,0.3)", background: C.forest, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
