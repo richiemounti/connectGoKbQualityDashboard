@@ -3,30 +3,37 @@
 ===================================================================================
 CONNECTGO KB QUALITY DASHBOARD — DEPLOYMENT NOTES FOR SAM
 ===================================================================================
+
 WHAT THIS FILE IS:
   Self-contained HTML dashboard for the ConnectGo Knowledge Base QA pipeline.
   Uses React (loaded via CDN) + Babel (transpiles JSX in browser).
   Currently runs on seed/demo data. Needs a Netlify Function to go live.
+
 WHAT SAM NEEDS TO BUILD:
   A Netlify serverless function at: netlify/functions/notion-data.js
   The dashboard calls: GET /.netlify/functions/notion-data
   It expects a JSON array of items back (schema below).
+
 FOLDER STRUCTURE FOR NETLIFY:
   /
   ├── index.html                        ← this file, renamed to index.html
   └── netlify/
       └── functions/
           └── notion-data.js            ← Sam builds this
+
 NETLIFY ENVIRONMENT VARIABLE:
   NOTION_TOKEN = <ConnectGo Compliance v2 integration token>
   Set this in Netlify: Site configuration → Environment variables
   NEVER put the token in code.
+
 NOTION DATABASES TO QUERY (all use ConnectGo Compliance v2 integration):
   Themes DB:      30a60bfb-014e-80c6-8bfb-000b4f8f6d4b
   Sub-themes DB:  30a60bfb-014e-8056-95b2-000b7eeff70d
   Indicators DB:  30a60bfb-014e-8001-b8eb-000bb2d071bf
   Questions DB:   30a60bfb-014e-8013-b1e2-000b94a07c65
+
 NOTION FIELD NAMES TO EXTRACT PER DB:
+
   ALL FOUR DBs — QA fields (added June 2026):
     "Requires Action"          → select field
     "Action Needed By"         → multi-select field (Belinda / Kate / Hope / Hannah)
@@ -37,20 +44,24 @@ NOTION FIELD NAMES TO EXTRACT PER DB:
     "Construct Understanding ★"→ select field (extract leading number 1-5)
     "Design ★"                 → select field (extract leading number 1-5)
     "Review Notes"             → rich text field
+
   THEMES DB specific:
     Title field = "Theme Name"
     "Theme Status"             → status field
     "Vertical"                 → select field
+
   SUB-THEMES DB specific:
     Title field = "Sub-theme name"
     "Subtheme Status"          → status field
     "Vertical"                 → select field
     "Theme"                    → relation field (grab first related page ID)
+
   INDICATORS DB specific:
     Title field = page title
     Status field = check schema — may be "Indicator Status"
     "Vertical"                 → select field
     "Sub-theme"                → relation field (grab first related page ID)
+
   QUESTIONS DB specific:
     Title field = "Question Text"
     "Question Status"          → status field
@@ -59,6 +70,7 @@ NOTION FIELD NAMES TO EXTRACT PER DB:
     "Indicator database"       → relation field (grab first related page ID)
       NOTE: this is the Questions→Indicators link. Currently one-way.
       Include the linked indicator page ID as "parentIndicatorId" in the response.
+
 JSON RESPONSE SCHEMA (array of objects):
   [
     {
@@ -82,23 +94,29 @@ JSON RESPONSE SCHEMA (array of objects):
       "parentIndicatorId": string  // related indicator page URL or null (questions only)
     }
   ]
+
 CORS:
   The function must return header: Access-Control-Allow-Origin: *
+
 PAGINATION:
   Notion returns max 100 items per request. Use cursor-based pagination
   (has_more + next_cursor) to fetch all records from each DB.
+
 CACHING (optional but recommended):
   Cache the Notion response for 5-10 minutes to avoid rate limits.
   A simple in-memory cache in the function is fine.
+
 SWITCHING FROM DEMO TO LIVE DATA:
   The dashboard auto-detects whether the function exists.
   If /.netlify/functions/notion-data returns 200, it uses live data.
   If it 404s or errors, it falls back to seed data with "Demo mode" message.
   No changes needed to this HTML file once the function is deployed.
+
 QUESTIONS:
   Kate McAlpine — kate@connectgo.co.uk
 ===================================================================================
 -->
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -120,6 +138,7 @@ select, input, button { font-family: 'Rajdhani', sans-serif; }
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useMemo } = React;
+
 // ─── BRAND COLOURS ───────────────────────────────────────────────────────────
 const C = {
   forest: "#11302A", plum: "#511433", olive: "#858755",
@@ -127,8 +146,10 @@ const C = {
   white: "#FFFFFF", off: "#F5F3EE", cloud: "#EAE6DC",
   muted: "#5A5040", dim: "#9A9080"
 };
+
 // ─── SCOPE CONFIG ─────────────────────────────────────────────────────────────
 const IN_SCOPE_VERTICALS = ['RfC', 'C4C', 'RfN'];
+
 // ─── SEED DATA ────────────────────────────────────────────────────────────────
 const SEED_DATA = [
   // ── REFLECT Sub-themes (Ruvuma review) ──────────────────────────────────────
@@ -142,6 +163,7 @@ const SEED_DATA = [
   { id: "s8", db: "Sub-themes", name: "Emotional and Perceptual Responses to Climate Change", themeId: "t2", vertical: "RfC", status: "Approved", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-21", taxonomic: 5, construct: 5, design: 4, notes: "Provisionally approved. Boundary check needed", url: "https://app.notion.com/p/36860bfb014e81d5ac7cf21a26bc53c8" },
   { id: "s9", db: "Sub-themes", name: "Perceived Social Burdens and Tensions", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/31b60bfb014e80109a82d2a5f0217410" },
   { id: "s10", db: "Sub-themes", name: "Perceived Fairness of Benefit Distribution", themeId: "t1", vertical: "RfC", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/31b60bfb014e808d909afeb5ab9bd0be" },
+
   // ── C4C Indicators (awaiting Kate review) ────────────────────────────────────
   { id: "i1", db: "Indicators", name: "Proportion of caregivers who report applying at least one programme-learned strategy at home with their child since their last session", themeId: "c4c-ce", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 3, notes: "Strong behaviour transfer construct. Check response option framing — retrospective period needs tightening.", url: "https://app.notion.com/p/33e60bfb014e8171b86cf23b00767ef5" },
   { id: "i2", db: "Indicators", name: "Proportion of caregivers who report a meaningful increase in confidence in supporting their child's learning, measured on a validated scale at baseline and six months post-enrolment", themeId: "c4c-cl", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 4, notes: "Well-specified. Confirm which validated scale is referenced — needs citation in descriptor.", url: "https://app.notion.com/p/31f60bfb014e804c9a2fc96523b73b60" },
@@ -155,6 +177,7 @@ const SEED_DATA = [
   { id: "i10", db: "Indicators", name: "Proportion of caregivers who report cultural norms or gender-based expectations as preventing or limiting their engagement with school", themeId: "c4c-ei", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 4, design: 3, notes: "Diagnostic indicator. Sensitive framing needed — check Swahili translation guidance for 'cultural norms'.", url: "https://app.notion.com/p/33e60bfb014e8193b40ef1ec0f726433" },
   { id: "i11", db: "Indicators", name: "Proportion of caregivers who score at or above the adequacy threshold on a validated brief resilience scale", themeId: "c4c-pw", vertical: "C4C", status: "In Review", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 3, design: 4, notes: "Which validated scale? Adequacy threshold not defined in current descriptor. Needs citation.", url: "https://app.notion.com/p/33e60bfb014e817cb2aae30118ff6a44" },
   { id: "i12", db: "Indicators", name: "Proportion of caregivers who attended at least one programme engagement activity in the reporting year", themeId: "c4c-ce", vertical: "C4C", status: "Approved", requiresAction: null, url: "https://app.notion.com/p/36160bfb014e813b8772ed2344f09cfc" },
+
   // ── C4C Questions (Belinda to complete) ──────────────────────────────────────
   { id: "q1", db: "Questions", name: "In the past six months, have you tried any of the learning support strategies you heard about in the programme sessions at home with your child?", themeId: "c4c-ce", vertical: "C4C", status: "In Development", requiresAction: "Complete Missing Fields", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 1, design: 3, notes: "Missing response options entirely. Also needs ToC Stage and sub-theme link.", url: "https://app.notion.com/p/33e60bfb014e8171b86cf23b00767ef5" },
   { id: "q2", db: "Questions", name: "How confident do you feel in helping your child with their schoolwork and learning at home?", themeId: "c4c-cl", vertical: "C4C", status: "In Development", requiresAction: "Complete Missing Fields", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 2, design: 4, notes: "Response options incomplete — scale defined but anchor labels missing.", url: "https://app.notion.com/p/31f60bfb014e804c9a2fc96523b73b60" },
@@ -163,9 +186,11 @@ const SEED_DATA = [
   { id: "q5", db: "Questions", name: "Does your child have a quiet place at home where they can do their homework or study?", themeId: "c4c-hc", vertical: "C4C", status: "Draft Complete", requiresAction: "Awaiting Sign-off", actionNeededBy: "Kate", deadline: "2026-06-28", completeness: 5, design: 5, notes: "Excellent — simple, concrete, binary, easy to translate. Approve.", url: "https://app.notion.com/p/33e60bfb014e81f3bf2fdf4edc194a65" },
   { id: "q6", db: "Questions", name: "In the past school term, did you speak with a teacher or school staff member about how your child is getting on with their learning?", themeId: "c4c-ce", vertical: "C4C", status: "In Development", requiresAction: "Revise and Resubmit", actionNeededBy: "Belinda", deadline: "2026-06-25", completeness: 3, design: 2, notes: "Currently uses hypothetical framing ('would you speak'). Rewrite to retrospective ('did you speak'). Also missing Indicator link.", url: "https://app.notion.com/p/32060bfb014e8089a731dc9c8d6e6db6" },
 ];
+
 // Read-only local preview data, extracted from the Carbon Standards export.
 // Netlify replaces it with live Notion records whenever the function is available.
 const STANDARDS_PREVIEW_DATA = [{"id":"standard-19","db":"Standards","name":"Plan Vivo: PV Nature: Methodology & Data Protocol: 2025","status":"Not started","standardProgram":"PV Nature","version":"1.2","reviewer":"","documentUrl":"https://s3.eu-west-2.amazonaws.com/assets.planvivo.org/documents/PV-Nature-Documents/PV-Nature_Methodology-Data-Protocol_V1.2_2026-04-29-123312_crld.pdf"},{"id":"standard-22","db":"Standards","name":"Gold Standard: Principles and Requirements: 2025","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2025","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/standards/101_V2.1_PAR_Principles-Requirements.pdf"},{"id":"standard-17","db":"Standards","name":"Verra: VCS: Program Standard: v5.0","status":"Not started","standardProgram":"Verified Carbon Standards (VCS)","version":"5","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2025/12/VCS-Standard-v5.0.pdf"},{"id":"standard-16","db":"Standards","name":"Verra: JNR REDD+: Program Guide: v4.1","status":"Not started","standardProgram":"JNR REDD+","version":"4.1","reviewer":"","documentUrl":"https://verra.org/programs/jurisdictional-nested-redd-framework/jnr-program-details/"},{"id":"standard-18","db":"Standards","name":"Plan Vivo: PV Nature: Project Requirements: 2025","status":"Not started","standardProgram":"PV Nature","version":"1.1","reviewer":"","documentUrl":"https://s3.eu-west-2.amazonaws.com/assets.planvivo.org/documents/PV-Nature-Documents/PV-Nature_Project-Requirements_V.1.1.pdf"},{"id":"standard-15","db":"Standards","name":"Verra: VCS: Program Standard: v4.7","status":"Not started","standardProgram":"Verified Carbon Standards (VCS)","version":"4.7","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/04/VCS-Standard-v4.7-FINAL-4.15.24.pdf"},{"id":"standard-21","db":"Standards","name":"Gold Standard: SDG Impact Tool: Monitoring Indicator Requirements: 2025","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2025","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/118_par_requirements-for-monitoring-indicator-selection/"},{"id":"standard-20","db":"Standards","name":"Gold Standard: Gender Equality Requirements & Guidelines: 2025","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2025","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/104-par-gender-equality-requirements-and-guidelines/"},{"id":"standard-27","db":"Standards","name":"W+ Standard: Domain — Income & Assets: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-30","db":"Standards","name":"W+ Standard: Domain — Health: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-25","db":"Standards","name":"W+ Standard: Validation & Verification Requirements: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2025/02/Guidance-Document-for-Validation-and-Verification-Bodies-VVBs-of-the-W-Standard-.pdf"},{"id":"standard-29","db":"Standards","name":"W+ Standard: Domain — Leadership: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-24","db":"Standards","name":"W+ Standard: Domains & Indicators Methodology: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/"},{"id":"standard-32","db":"Standards","name":"W+ Standard: Domain — Mobility: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-28","db":"Standards","name":"W+ Standard: Domain — Education & Knowledge: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-26","db":"Standards","name":"W+ Standard: Domain — Time: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-31","db":"Standards","name":"W+ Standard: Domain — Food Security: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-23","db":"Standards","name":"W+ Standard: Standard: v3.0","status":"Not started","standardProgram":"W+ Standard","version":"3","reviewer":"Kate McAlpine","documentUrl":"https://www.wplus.org/wp-content/uploads/2019/07/W-Standard.pdf"},{"id":"standard-41","db":"Standards","name":"Equitable Earth: Programme Rules","status":"Not started","standardProgram":"Equitable Earth","version":"","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-37","db":"Standards","name":"Equitable Earth: FPIC Guidelines: v1","status":"Not started","standardProgram":"Equitable Earth","version":"1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-43","db":"Standards","name":"Verra: CCB: Program Rules: v3.1","status":"Not started","standardProgram":"CCB Standards","version":"3.1","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/07/CCB-Program-Rules-v3.1.pdf"},{"id":"standard-36","db":"Standards","name":"Equitable Earth: Safeguarding Declaration Matrix: v1.1","status":"Not started","standardProgram":"Equitable Earth","version":"1.1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-52","db":"Standards","name":"Fairtrade Climate Standard: Carbon Credits Requirements for Producers & Traders","status":"Not started","standardProgram":"Fairtrade Climate Standard","version":"","reviewer":"","documentUrl":""},{"id":"standard-45","db":"Standards","name":"Gold Standard: Safeguarding Principles & Requirements: 2023","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2023","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/standards/103_V1.2_PAR_Safeguarding-Principles-Requirements.pdf"},{"id":"standard-38","db":"Standards","name":"Equitable Earth: CSR Policy: v1","status":"Not started","standardProgram":"Equitable Earth","version":"1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-40","db":"Standards","name":"Equitable Earth: SDG Contribution Toolkit: v1.1","status":"Not started","standardProgram":"Equitable Earth","version":"1.1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-47","db":"Standards","name":"Gold Standard: Claims Guidelines: 2022","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2022","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/105-par-claims-guidelines/"},{"id":"standard-46","db":"Standards","name":"Gold Standard: Site Visit and Remote Audit Requirements: 2023","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2023","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/112_par_site-visit-and-remote-audit-requirements-and-procedures/"},{"id":"standard-39","db":"Standards","name":"Equitable Earth: Core Programme Manual: v1.2","status":"Not started","standardProgram":"Equitable Earth","version":"1.2","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-50","db":"Standards","name":"VCMI: Access Strategies Toolkit","status":"Not started","standardProgram":"VCMI","version":"","reviewer":"","documentUrl":""},{"id":"standard-35","db":"Standards","name":"Equitable Earth: Livelihood Matrix (2022): v1","status":"Not started","standardProgram":"Equitable Earth","version":"1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-1"},{"id":"standard-34","db":"Standards","name":"Equitable Earth: Livelihood Matrix: v1.1","status":"Not started","standardProgram":"Equitable Earth","version":"1.1","reviewer":"","documentUrl":"https://www.eq-earth.com/programme/1-2"},{"id":"standard-49","db":"Standards","name":"VCMI: Monitoring Reporting & Assurance Framework","status":"Not started","standardProgram":"VCMI","version":"","reviewer":"","documentUrl":""},{"id":"standard-42","db":"Standards","name":"Verra: CCB: Program Standards: v3.1","status":"Not started","standardProgram":"CCB Standards","version":"3.1","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/07/CCB-Standards-v3.1_ENG.pdf"},{"id":"standard-44","db":"Standards","name":"Gold Standard: Stakeholder Consultation & Engagement Requirements: 2022","status":"Not started","standardProgram":"Gold Standard for the Global Goals","version":"2022","reviewer":"","documentUrl":"https://globalgoals.goldstandard.org/102-par-stakeholder-consultation-requirements/"},{"id":"standard-51","db":"Standards","name":"Fairtrade Climate Standard: Standard","status":"Not started","standardProgram":"Fairtrade Climate Standard","version":"","reviewer":"","documentUrl":""},{"id":"standard-33","db":"Standards","name":"Equitable Earth: Core Programme Document: v1.2","status":"Not started","standardProgram":"Equitable Earth","version":"1.2","reviewer":"","documentUrl":"https://docs.eq-earth.com/equitable-earth-standard-v1.2.pdf"},{"id":"standard-48","db":"Standards","name":"VCMI: Claims Code of Practice","status":"Not started","standardProgram":"VCMI","version":"","reviewer":"","documentUrl":""},{"id":"standard-57","db":"Standards","name":"OxCarbon: Public Consultation Policy","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/04/Public-Consultation-4.pdf"},{"id":"standard-64","db":"Standards","name":"CAR: Program Manual","status":"Not started","standardProgram":"CAR","version":"9","reviewer":"","documentUrl":"https://www.climateactionreserve.org/wp-content/uploads/2023/11/ROPM-Version-9.0-November-2023.pdf"},{"id":"standard-60","db":"Standards","name":"OxCarbon: Grievance Policy","status":"Not started","standardProgram":"","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/03/Grievance-Policy-2.pdf"},{"id":"standard-55","db":"Standards","name":"OxCarbon: General Guidance for ARR Projects","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2023/07/OxCarbon-General-Guide-for-Afforestation-Reforestation-and-Restoration-Projects.pdf"},{"id":"standard-59","db":"Standards","name":"OxCarbon: Whistle-Blowing Policy","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/04/Whsitleblowing-4.pdf"},{"id":"standard-61","db":"Standards","name":"ACR: Standard","status":"Not started","standardProgram":"ACR","version":"8","reviewer":"","documentUrl":"https://acrcarbon.org/wp-content/uploads/2023/10/ACR-Standard-v8.0.pdf"},{"id":"standard-54","db":"Standards","name":"OxCarbon: Oxford Principles for Net Zero Aligned Carbon Offsetting: 2024","status":"Not started","standardProgram":"OxCarbon","version":"2024","reviewer":"","documentUrl":"https://www.smithschool.ox.ac.uk/sites/default/files/2024-02/Oxford-Principles-for-Net-Zero-Aligned-Carbon-Offsetting-revised-2024.pdf"},{"id":"standard-63","db":"Standards","name":"ACR: Nature-Based Solutions Requirements","status":"Not started","standardProgram":"ACR","version":"","reviewer":"","documentUrl":"https://acrcarbon.org/acr-program/"},{"id":"standard-67","db":"Standards","name":"BioCarbon Registry: Methodologies","status":"Not started","standardProgram":"BioCarbon Registry","version":"","reviewer":"","documentUrl":"https://biocarbonstandard.com/"},{"id":"standard-58","db":"Standards","name":"OxCarbon: Anti-Corruption Policy","status":"Not started","standardProgram":"OxCarbon","version":"","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/03/Anti-Corruption-Policy.pdf"},{"id":"standard-65","db":"Standards","name":"CAR: Verification Program Manual","status":"Not started","standardProgram":"CAR","version":"","reviewer":"","documentUrl":"https://climateactionreserve.org/how/program-resources/program-manual/"},{"id":"standard-62","db":"Standards","name":"ACR: Validation and Verification Standard","status":"Not started","standardProgram":"ACR","version":"","reviewer":"","documentUrl":"https://acrcarbon.org/wp-content/uploads/2023/09/2023.05.29-ACR-VV-Standard_V1.1_May-31-2018.pdf"},{"id":"standard-66","db":"Standards","name":"BioCarbon Registry: Standard — Program Rules","status":"Not started","standardProgram":"BioCarbon Registry","version":"2","reviewer":"","documentUrl":"https://biocarbonregistry.com/wp-content/uploads/2022/02/14.02.2022_BioCarbon-Registry-Standard-v2.0_en1.pdf"},{"id":"standard-56","db":"Standards","name":"OxCarbon: Practical Guidance for ARR Projects: v1","status":"Not started","standardProgram":"OxCarbon","version":"1","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2024/03/OXCarbon_Practical_Guidance_v1.0_Final-1.pdf"},{"id":"standard-53","db":"Standards","name":"OxCarbon: Principles-Based Standard: v1.6","status":"Not started","standardProgram":"OxCarbon","version":"1.6","reviewer":"","documentUrl":"https://oxcarbon.org/wp-content/uploads/2023/05/OxCarbon-Guidelines-v1.6-Jan-2023.pdf"},{"id":"standard-76","db":"Standards","name":"CSI: European Biochar Certificate (EBC)","status":"Not started","standardProgram":"CSI / EBC","version":"","reviewer":"","documentUrl":""},{"id":"standard-71","db":"Standards","name":"GCC: Rules & Procedures","status":"Not started","standardProgram":"GCC","version":"","reviewer":"","documentUrl":""},{"id":"standard-74","db":"Standards","name":"Woodland Carbon Code (UK): Requirements","status":"Not started","standardProgram":"Woodland Carbon Code","version":"","reviewer":"","documentUrl":""},{"id":"standard-72","db":"Standards","name":"GCC: Approved Methodologies","status":"Not started","standardProgram":"GCC","version":"","reviewer":"","documentUrl":""},{"id":"standard-68","db":"Standards","name":"Puro Earth: Standard — General Rules","status":"Not started","standardProgram":"Puro Earth","version":"4.4","reviewer":"","documentUrl":"https://7518557.fs1.hubspotusercontent-na1.net/hubfs/7518557/Supplier%20Documents/General%20Rules%204_4.pdf"},{"id":"standard-75","db":"Standards","name":"Woodland Carbon Code (UK): Carbon Calculation Methodology","status":"Not started","standardProgram":"Woodland Carbon Code","version":"","reviewer":"","documentUrl":""},{"id":"standard-80","db":"Standards","name":"ICR: Standard","status":"Not started","standardProgram":"ICR","version":"","reviewer":"","documentUrl":""},{"id":"standard-73","db":"Standards","name":"Peatland Code (UK): Standard & Requirements","status":"Not started","standardProgram":"Peatland Code","version":"","reviewer":"","documentUrl":""},{"id":"standard-81","db":"Standards","name":"ICR: Methodologies","status":"Not started","standardProgram":"ICR","version":"","reviewer":"","documentUrl":""},{"id":"standard-70","db":"Standards","name":"Puro Earth: Auditing & Verification Rules","status":"Not started","standardProgram":"Puro Earth","version":"","reviewer":"","documentUrl":""},{"id":"standard-69","db":"Standards","name":"Puro Earth: Standard — Output Methodologies","status":"Not started","standardProgram":"Puro Earth","version":"","reviewer":"","documentUrl":""},{"id":"standard-79","db":"Standards","name":"UCR: Methodologies","status":"Not started","standardProgram":"UCR","version":"","reviewer":"","documentUrl":""},{"id":"standard-78","db":"Standards","name":"UCR: Standard","status":"Not started","standardProgram":"UCR","version":"","reviewer":"","documentUrl":""},{"id":"standard-77","db":"Standards","name":"CSI: Durable CDR Methodologies","status":"Not started","standardProgram":"CSI / EBC","version":"","reviewer":"","documentUrl":""},{"id":"standard-88","db":"Standards","name":"SocialCarbon: Capital — Financial: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-84","db":"Standards","name":"SocialCarbon: Methodology Requirements: v2.1","status":"Not started","standardProgram":"SOCIALCARBON","version":"2.1","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON-Methodology_Requirements_v21.pdf"},{"id":"standard-82","db":"Standards","name":"SocialCarbon: Standard Guide: v2.1","status":"Not started","standardProgram":"SOCIALCARBON","version":"2.1","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON-Standard_Guide_v21.pdf"},{"id":"standard-86","db":"Standards","name":"SocialCarbon: Capital — Human: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-89","db":"Standards","name":"SocialCarbon: Capital — Physical: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-83","db":"Standards","name":"SocialCarbon: Standard (Nature3): v7.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"7","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_Standard_v70.pdf"},{"id":"standard-90","db":"Standards","name":"SocialCarbon: Capital — Biodiversity: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-87","db":"Standards","name":"SocialCarbon: Capital — Social: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-85","db":"Standards","name":"SocialCarbon: Capital — Natural: v5.0","status":"Not started","standardProgram":"SOCIALCARBON","version":"5","reviewer":"Kate McAlpine","documentUrl":"https://www.socialcarbon.org/s/SOCIALCARBON_STANDARD_v-5-0-final-II.pdf"},{"id":"standard-91","db":"Standards","name":"Verra: CCB: Program Definitions","status":"Not started","standardProgram":"CCB Standards","version":"3","reviewer":"","documentUrl":"https://verra.org/wp-content/uploads/2024/07/CCB_Program_Definitions_v3.0.pdf"}];
+
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 const normVert = v => Array.isArray(v) ? v : (v == null || v === "" ? [] : [v]);
 // Retired records are intentionally excluded everywhere. A record still marked
@@ -183,6 +208,7 @@ const isWeek = d => { if (!d) return false; const t = todayStr(); const e = new 
 const isDue = d => !!d && (isWeek(d) || isOver(d));
 const dateText = d => d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 const monthText = d => d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+
 // ─── PEOPLE ───────────────────────────────────────────────────────────────────
 const PEOPLE = {
   Belinda: { color: C.olive,   initials: 'BE', role: 'Content developer' },
@@ -193,6 +219,7 @@ const PEOPLE = {
 };
 // Named individuals only (excludes "Both") — used to drive queue cards and batch columns
 const NAMED_OWNERS = ['Belinda', 'Kate', 'Hope', 'Hannah'];
+
 const PILL_STYLES = {
   "Belinda": { bg: "rgba(133,135,85,0.15)", color: "#505530" },
   "Kate":    { bg: "rgba(81,20,51,0.15)",   color: "#511433" },
@@ -203,7 +230,6 @@ const PILL_STYLES = {
   "Awaiting Sign-off":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
   "Ready to Publish":          { bg: "rgba(17,48,42,0.08)",   color: C.forest },
   "Retire":                    { bg: "rgba(238,92,95,0.12)", color: "#901818" },
-  "Edit in Platform":          { bg: "rgba(78,124,168,0.12)", color: "#234e72" },
   "Discuss with Kate":         { bg: "rgba(81,20,51,0.1)",    color: C.plum },
   "Discuss with Hope":         { bg: "rgba(196,123,58,0.1)",  color: "#7a4000" },
   "Discuss with Hannah":       { bg: "rgba(78,124,168,0.1)",  color: "#234e72" },
@@ -213,10 +239,12 @@ const PILL_STYLES = {
   "Indicators": { bg: "rgba(133,135,85,0.1)",   color: C.olive },
   "Questions":  { bg: "rgba(17,48,42,0.08)",    color: C.forest },
 };
+
 const Pill = ({ label, small }) => {
   const s = PILL_STYLES[label] || { bg: "#eee", color: "#333" };
   return <span style={{ display: "inline-block", borderRadius: 3, padding: small ? "1px 5px" : "2px 7px", fontSize: small ? 9 : 10, fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap", background: s.bg, color: s.color }}>{label}</span>;
 };
+
 const Stars = ({ score, n = 5 }) => {
   if (score === null) return <span style={{ fontSize: 10, color: C.dim }}>—</span>;
   return <span style={{ display: "flex", gap: 2, alignItems: "center" }}>
@@ -227,6 +255,7 @@ const Stars = ({ score, n = 5 }) => {
     <span style={{ fontSize: 11, color: C.muted, marginLeft: 5, fontWeight: 600 }}>{score.toFixed ? score.toFixed(1) : score}</span>
   </span>;
 };
+
 const KPI = ({ val, label, sub, accent }) => (
   <div style={{ background: C.white, borderRadius: 6, padding: "18px 20px", borderLeft: `4px solid ${accent || C.olive}` }}>
     <div style={{ fontSize: 34, fontWeight: 700, color: accent === C.coral && parseInt(val) > 0 ? C.coral : C.forest, lineHeight: 1 }}>{val}</div>
@@ -234,6 +263,7 @@ const KPI = ({ val, label, sub, accent }) => (
     {sub && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{sub}</div>}
   </div>
 );
+
 const Card = ({ title, sub, children, mb }) => (
   <div style={{ background: C.white, borderRadius: 6, padding: "20px 22px", marginBottom: mb || 0 }}>
     {title && <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase", marginBottom: 14 }}>{title}</div>}
@@ -241,10 +271,12 @@ const Card = ({ title, sub, children, mb }) => (
     {children}
   </div>
 );
+
 const ActionPill = ({ action }) => {
-  const labels = { "Complete Missing Fields": "Complete Fields", "Revise and Resubmit": "Revise", "Awaiting Sign-off": "Sign-off", "Ready to Publish": "Ready", "Retire": "Retire", "Edit in Platform": "Platform Edit" };
+  const labels = { "Complete Missing Fields": "Complete Fields", "Revise and Resubmit": "Revise", "Awaiting Sign-off": "Sign-off", "Ready to Publish": "Ready", "Retire": "Retire" };
   return <Pill label={action} />;
 };
+
 // ─── PERSON QUEUE CARD ────────────────────────────────────────────────────────
 const PersonQueueCard = ({ person, filtered }) => {
   const cfg = PEOPLE[person] || { color: C.muted, initials: person.slice(0, 2).toUpperCase(), role: '' };
@@ -256,6 +288,7 @@ const PersonQueueCard = ({ person, filtered }) => {
   queue.forEach(r => { actionCounts[r.requiresAction] = (actionCounts[r.requiresAction] || 0) + 1; });
   const topAction = Object.entries(actionCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
   const maxBar = Math.max(overdue, dueWeek, noDl, 1);
+
   const bar = (count, color, label) => count > 0 && (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 5 }}>
       <div style={{ flex: 1, height: 5, background: C.cloud, borderRadius: 3, overflow: 'hidden' }}>
@@ -264,6 +297,7 @@ const PersonQueueCard = ({ person, filtered }) => {
       <span style={{ fontSize: 10, fontWeight: 700, color, minWidth: 80, textAlign: 'right' }}>{count} {label}</span>
     </div>
   );
+
   return (
     <div style={{ background: C.white, borderRadius: 8, padding: '18px 20px', borderTop: `4px solid ${cfg.color}`, display: 'flex', flexDirection: 'column', gap: 0 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
@@ -289,9 +323,11 @@ const PersonQueueCard = ({ person, filtered }) => {
     </div>
   );
 };
+
 // ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
 // ─── DISCREPANCY ENGINE ───────────────────────────────────────────────────────
 function normName(s) { return (s || '').toLowerCase().trim().replace(/\s+/g, ' '); }
+
 function computeDiscrepancies(notionData, platformData) {
   if (!platformData || !notionData) return { themes: [], subthemes: [], indicators: [], questions: [] };
   // Themes/Sub-themes/Indicators have a direct Vertical select; questions only get it via a rollup that often returns null.
@@ -309,6 +345,7 @@ function computeDiscrepancies(notionData, platformData) {
     questions:  notionData.filter(r => r.db === 'Questions'  && inScopeQ(r) && !backendQuestions.has(normName(r.name))),
   };
 }
+
 // ─── ACTION BREAKDOWN (expandable) ───────────────────────────────────────────
 const ACTION_COLORS = {
   'Complete Missing Fields': '#F0C71D',
@@ -322,17 +359,22 @@ const actionColor = k => {
   if (k && k.startsWith('Discuss with')) return (PEOPLE[k.replace('Discuss with ', '')] || {}).color || C.muted;
   return C.muted;
 };
+
 const PAGE = 10;
+
 const ActionBreakdown = ({ filtered, total }) => {
   const [expanded, setExpanded] = useState({});
   const [shown, setShown] = useState({});
+
   const aC = {};
   filtered.forEach(r => { if (isActionable(r)) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+
   const toggle = k => setExpanded(e => ({ ...e, [k]: !e[k] }));
   const showMore = (e, k, items) => {
     e.stopPropagation();
     setShown(s => ({ ...s, [k]: Math.min((s[k] || PAGE) + PAGE, items.length) }));
   };
+
   return (
     <Card title="Action Breakdown">
       <div style={{ maxHeight: 520, overflowY: 'auto', overflowX: 'hidden' }}>
@@ -344,6 +386,7 @@ const ActionBreakdown = ({ filtered, total }) => {
         const visible = items.slice(0, limit);
         const hasMore = items.length > limit;
         const pct     = total > 0 ? Math.round(v / total * 100) : 0;
+
         return (
           <div key={k} style={{ marginBottom: isOpen ? 14 : 8 }}>
             {/* Clickable header row */}
@@ -385,6 +428,7 @@ const ActionBreakdown = ({ filtered, total }) => {
     </Card>
   );
 };
+
 const Overview = ({ filtered, discrepancies, allData }) => {
   const total = filtered.length;
   const needs = filtered.filter(isActionable).length;
@@ -392,15 +436,16 @@ const Overview = ({ filtered, discrepancies, allData }) => {
   const wk    = filtered.filter(r => isWeek(r.deadline) && !isOver(r.deadline)).length;
   const aC = {};
   filtered.forEach(r => { if (isActionable(r)) aC[r.requiresAction] = (aC[r.requiresAction] || 0) + 1; });
+
   const dims = ["taxonomic", "completeness", "construct", "design"];
   const dL   = ["Taxonomic Thinking", "Completeness", "Construct Understanding", "Design"];
+
   // Fixed pipeline stages
   const FIXED_STAGES = [
     { key: 'Complete Missing Fields', color: '#F0C71D', owner: 'Belinda' },
     { key: 'Revise and Resubmit',     color: C.coral,   owner: 'Belinda' },
     { key: 'Awaiting Sign-off',       color: C.plum,    owner: 'Kate' },
     { key: 'Ready to Publish',        color: C.forest,  owner: null },
-    { key: 'Edit in Platform',        color: '#4e7ca8', owner: null },
     { key: 'Retire',                  color: C.coral,   owner: null },
   ];
   // Dynamic discuss stages derived from live data
@@ -410,6 +455,7 @@ const Overview = ({ filtered, discrepancies, allData }) => {
     const who = key.replace('Discuss with ', '');
     return { key, color: (PEOPLE[who] || {}).color || C.muted, owner: who, isDiscuss: true };
   });
+
   return <div>
     {/* Top stats row */}
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 16 }}>
@@ -418,10 +464,12 @@ const Overview = ({ filtered, discrepancies, allData }) => {
       <KPI val={over}  label="Overdue"     accent={C.coral} />
       <KPI val={wk}    label="Due this week" accent="#F0C71D" />
     </div>
+
     {/* Per-person queue cards */}
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12, marginBottom: 16 }}>
       {NAMED_OWNERS.map(person => <PersonQueueCard key={person} person={person} filtered={filtered} />)}
     </div>
+
     {/* Pipeline + Quality */}
     <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
       <Card title="Action Pipeline">
@@ -515,6 +563,7 @@ const Overview = ({ filtered, discrepancies, allData }) => {
     })()}
   </div>;
 };
+
 // ─── TODAY TAB ────────────────────────────────────────────────────────────────
 const Today = ({ filtered, batchSize }) => {
   const buildBatch = (owner) => filtered
@@ -526,8 +575,10 @@ const Today = ({ filtered, batchSize }) => {
       return a.deadline ? -1 : b.deadline ? 1 : 0;
     })
     .slice(0, batchSize);
+
   // Always show each named person's batch, including Hannah when her queue is empty.
   const activeOwners = NAMED_OWNERS;
+
   const BatchItem = ({ r, i, owner }) => {
     const cfg = PEOPLE[owner] || { color: C.muted };
     return (
@@ -550,9 +601,11 @@ const Today = ({ filtered, batchSize }) => {
       </div>
     );
   };
+
   if (activeOwners.length === 0) {
     return <div style={{ textAlign: "center", padding: 60, color: C.dim, fontStyle: "italic" }}>No active queues — all items are clear or unassigned</div>;
   }
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(activeOwners.length, 2)}, 1fr)`, gap: 16 }}>
       {activeOwners.map(owner => {
@@ -577,21 +630,26 @@ const Today = ({ filtered, batchSize }) => {
     </div>
   );
 };
+
 // ─── PIPELINE TAB ─────────────────────────────────────────────────────────────
 const Pipeline = ({ filtered }) => {
-  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Sign-off", "Ready to Publish", "Edit in Platform", "Retire"];
+  const FIXED_STAGES  = ["Complete Missing Fields", "Revise and Resubmit", "Awaiting Sign-off", "Ready to Publish", "Retire"];
   const discussStages = [...new Set(filtered.map(r => r.requiresAction).filter(v => v && v.startsWith('Discuss with')))].sort();
   const allStages     = [...FIXED_STAGES, ...discussStages];
+
   const tdStyle = { padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, fontSize: 12 };
+
   return <div>{allStages.map(s => {
     const items = filtered.filter(r => r.requiresAction === s);
     if (!items.length) return null;
     const isDiscuss = s.startsWith('Discuss with');
     const stageColor = actionColor(s);
+
     // Decide which attribution columns to show for this stage's items
     const showAssignedBy = items.some(r => r.assignedBy);
     const showDeveloped  = items.some(r => r.developedBy);
     const showApproved   = items.some(r => r.approvedBy);
+
     return <div key={s} style={{ background: C.white, borderRadius: 6, padding: "20px 22px", marginBottom: 16, borderLeft: isDiscuss ? `4px dashed ${stageColor}55` : 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         {isDiscuss && <span style={{ fontSize: 14 }}>💬</span>}
@@ -623,6 +681,7 @@ const Pipeline = ({ filtered }) => {
     </div>;
   })}</div>;
 };
+
 // ─── QUALITY TAB ─────────────────────────────────────────────────────────────
 const Quality = ({ filtered }) => {
   const dims = ["taxonomic", "completeness", "construct", "design"];
@@ -684,11 +743,13 @@ const Quality = ({ filtered }) => {
     </div>
   </div>;
 };
+
 // ─── HIERARCHY TAB ────────────────────────────────────────────────────────────
 // Sub-theme row — expandable, shows indicators + questions inside
 const HierarchySub = ({ sub, indicators, questions }) => {
   const [open, setOpen] = useState(false);
   const hasAction = isActionable(sub);
+
   return (
     <div style={{ borderRadius: 4, marginBottom: 4, overflow: 'hidden', background: 'rgba(255,255,255,0.05)', borderLeft: hasAction ? '2px solid rgba(238,92,95,0.6)' : 'none' }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
@@ -754,12 +815,14 @@ const HierarchySub = ({ sub, indicators, questions }) => {
     </div>
   );
 };
+
 // Theme row — expandable, contains sub-themes
 const HierarchyTheme = ({ theme, subthemes, indsBySubtheme, qsBySubtheme }) => {
   const [open, setOpen] = useState(false);
   const actionCount = subthemes.filter(isActionable).length;
   const indTotal = subthemes.reduce((n, s) => n + (indsBySubtheme.get(s.id) || []).length, 0);
   const qTotal   = subthemes.reduce((n, s) => n + (qsBySubtheme.get(s.id)   || []).length, 0);
+
   return (
     <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, overflow: 'hidden', color: C.white }}>
       <div onClick={() => setOpen(o => !o)} style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
@@ -783,11 +846,13 @@ const HierarchyTheme = ({ theme, subthemes, indsBySubtheme, qsBySubtheme }) => {
     </div>
   );
 };
+
 const Hierarchy = ({ data }) => {
   const themes     = data.filter(r => r.db === 'Themes');
   const subthemes  = data.filter(r => r.db === 'Sub-themes');
   const indicators = data.filter(r => r.db === 'Indicators');
   const questions  = data.filter(r => r.db === 'Questions');
+
   // Build lookup maps from Notion relation URLs
   const subsByTheme = new Map();
   subthemes.forEach(s => {
@@ -795,24 +860,29 @@ const Hierarchy = ({ data }) => {
     if (!subsByTheme.has(s.themeId)) subsByTheme.set(s.themeId, []);
     subsByTheme.get(s.themeId).push(s);
   });
+
   const indsBySubtheme = new Map();
   indicators.forEach(ind => {
     if (!ind.subthemeId) return;
     if (!indsBySubtheme.has(ind.subthemeId)) indsBySubtheme.set(ind.subthemeId, []);
     indsBySubtheme.get(ind.subthemeId).push(ind);
   });
+
   const qsBySubtheme = new Map();
   questions.forEach(q => {
     if (!q.subthemeId) return;
     if (!qsBySubtheme.has(q.subthemeId)) qsBySubtheme.set(q.subthemeId, []);
     qsBySubtheme.get(q.subthemeId).push(q);
   });
+
   // Sub-themes with no matching theme in current data
   const linkedSubIds = new Set(subthemes.filter(s => s.themeId && themes.some(t => t.id === s.themeId)).map(s => s.id));
   const orphanSubs   = subthemes.filter(s => !linkedSubIds.has(s.id));
+
   if (themes.length === 0 && subthemes.length === 0) {
     return <div style={{ textAlign: 'center', padding: 60, color: C.dim, fontStyle: 'italic' }}>No data — sync from Notion to populate the hierarchy</div>;
   }
+
   return (
     <div>
       <div style={{ marginBottom: 16, padding: '14px 16px', background: 'rgba(81,20,51,0.08)', borderRadius: 6, borderLeft: `3px solid ${C.plum}`, fontSize: 13, color: C.muted }}>
@@ -836,13 +906,16 @@ const Hierarchy = ({ data }) => {
     </div>
   );
 };
+
 // ─── SEARCH TAB ───────────────────────────────────────────────────────────────
 const Search = ({ data }) => {
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [dbFilter, setDbFilter] = useState("ALL");
+
   const DB_COLORS = { Themes: C.amber, "Sub-themes": C.plum, Indicators: C.olive, Questions: C.forest };
   const DBS = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
+
   const scoreItem = (item, terms, fullQ) => {
     const name  = (item.name   || "").toLowerCase();
     const notes = (item.notes  || "").toLowerCase();
@@ -856,6 +929,7 @@ const Search = ({ data }) => {
     if (notes.includes(fullQ))    return 30;
     return 15;
   };
+
   const results = useMemo(() => {
     if (!submitted.trim()) return null;
     const fullQ = submitted.trim().toLowerCase();
@@ -866,16 +940,20 @@ const Search = ({ data }) => {
       .filter(r => r._score > 0)
       .sort((a, b) => b._score - a._score);
   }, [submitted, dbFilter, data]);
+
   const run  = () => { if (query.trim()) setSubmitted(query); };
   const clear = () => { setQuery(""); setSubmitted(""); };
+
   const byDb = results
     ? DBS.slice(1).reduce((acc, db) => { acc[db] = results.filter(r => r.db === db); return acc; }, {})
     : {};
+
   const fBtn = (label, val, cur, set) => (
     <button key={val} onClick={() => set(val)} style={{ padding: "4px 11px", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "inherit", border: `1px solid ${cur === val ? C.forest : C.cloud}`, background: cur === val ? C.forest : "transparent", color: cur === val ? C.white : C.muted, cursor: "pointer" }}>
       {label}
     </button>
   );
+
   return (
     <div>
       {/* ── Search bar ── */}
@@ -893,6 +971,7 @@ const Search = ({ data }) => {
           {DBS.map(db => fBtn(db === "ALL" ? "All DBs" : db, db, dbFilter, setDbFilter))}
         </div>
       </div>
+
       {/* ── Empty state ── */}
       {results === null && (
         <div style={{ textAlign: "center", padding: "56px 0", color: C.dim }}>
@@ -900,6 +979,7 @@ const Search = ({ data }) => {
           <div style={{ fontSize: 12 }}>Matches on name · review notes · status · Press Enter or click Search</div>
         </div>
       )}
+
       {/* ── No results ── */}
       {results !== null && results.length === 0 && (
         <div style={{ textAlign: "center", padding: "48px 0", color: C.dim }}>
@@ -907,6 +987,7 @@ const Search = ({ data }) => {
           <div style={{ fontSize: 12 }}>Try a shorter phrase, a single keyword, or remove filters</div>
         </div>
       )}
+
       {/* ── Results ── */}
       {results !== null && results.length > 0 && (
         <div>
@@ -916,6 +997,7 @@ const Search = ({ data }) => {
               <span key={db} style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 3, background: DB_COLORS[db] + "18", color: DB_COLORS[db] }}>{db}: {byDb[db].length}</span>
             ))}
           </div>
+
           <div style={{ maxHeight: 620, overflowY: 'auto' }}>
           {results.map((r, i) => {
             const col = DB_COLORS[r.db] || C.muted;
@@ -947,6 +1029,7 @@ const Search = ({ data }) => {
     </div>
   );
 };
+
 // ─── VELOCITY TAB ─────────────────────────────────────────────────────────────
 const Velocity = ({ data }) => {
   const dbs = ["Themes", "Sub-themes", "Indicators", "Questions"];
@@ -977,6 +1060,7 @@ const Velocity = ({ data }) => {
     </Card>
   </div>;
 };
+
 // ─── PLATFORM MODELS TAB ──────────────────────────────────────────────────────
 const PlatformTheme = ({ theme }) => {
   const [open, setOpen] = useState(false);
@@ -985,6 +1069,7 @@ const PlatformTheme = ({ theme }) => {
   const subCount = theme.subthemes?.length ?? 0;
   const indicCount = theme.subthemes?.reduce((n, s) => n + (s.indicators?.length ?? 0), 0) ?? 0;
   const qCount = theme.subthemes?.reduce((n, s) => n + (s.questions?.length ?? 0), 0) ?? 0;
+
   return <div style={{ background: C.forest, borderRadius: 6, marginBottom: 6, overflow: "hidden", color: C.white }}>
     <div onClick={() => setOpen(o => !o)} style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
       <span style={{ fontSize: 9, transition: "transform 0.15s", transform: open ? "rotate(90deg)" : "none", color: "rgba(255,255,255,0.4)" }}>▶</span>
@@ -1034,22 +1119,28 @@ const PlatformTheme = ({ theme }) => {
     </div>}
   </div>;
 };
+
 const PlatformCatalogueRow = ({ item, cols }) => (
   <div style={{ display: "grid", gridTemplateColumns: cols, gap: 12, padding: "9px 12px", borderBottom: `1px solid ${C.cloud}`, alignItems: "center" }}>
     {item}
   </div>
 );
+
 const Platform = ({ data }) => {
   const [catalogueTab, setCatalogueTab] = useState("standards");
+
   if (!data) return <div style={{ padding: "40px 0", textAlign: "center", color: C.muted, fontStyle: "italic" }}>
     Platform data unavailable — check that BACKEND_API_URL and KNOWLEDGEBASE_API_KEY are set in Netlify environment variables.
   </div>;
+
   const { summary, themes = [], standards = [], sdgs = [], esgCategories = [], exportedAt } = data;
+
   const catTabs = [
     { key: "standards", label: "Standards", count: standards.length },
     { key: "sdgs", label: "SDGs", count: sdgs.length },
     { key: "esg", label: "ESG Categories", count: esgCategories.length },
   ];
+
   return <div>
     {/* Summary row */}
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(120px,1fr))", gap: 12, marginBottom: 20 }}>
@@ -1068,6 +1159,7 @@ const Platform = ({ data }) => {
         </div>
       )}
     </div>
+
     {/* Theme tree */}
     <div style={{ marginBottom: 20 }}>
       <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", color: C.dim, textTransform: "uppercase", marginBottom: 10 }}>Theme Taxonomy</div>
@@ -1075,6 +1167,7 @@ const Platform = ({ data }) => {
         ? <div style={{ padding: "20px", textAlign: "center", color: C.muted, fontStyle: "italic", background: C.white, borderRadius: 6 }}>No published themes found</div>
         : themes.map(t => <PlatformTheme key={t._id} theme={t} />)}
     </div>
+
     {/* Catalogue tabs: Standards / SDGs / ESG */}
     <div style={{ background: C.white, borderRadius: 6, overflow: "hidden" }}>
       <div style={{ display: "flex", borderBottom: `1px solid ${C.cloud}`, padding: "0 16px" }}>
@@ -1082,6 +1175,7 @@ const Platform = ({ data }) => {
           {ct.label} <span style={{ fontSize: 10, color: C.dim }}>({ct.count})</span>
         </button>)}
       </div>
+
       {catalogueTab === "standards" && <div>
         <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 140px 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
           <span>Code</span><span>Name</span><span>Issuing Body</span><span>Status</span>
@@ -1095,6 +1189,7 @@ const Platform = ({ data }) => {
             <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: s.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: s.status === "active" ? C.olive : C.coral }}>{s.status}</span>
           </div>)}
       </div>}
+
       {catalogueTab === "sdgs" && <div>
         <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
           <span>Code</span><span>Goal</span><span>Status</span>
@@ -1107,6 +1202,7 @@ const Platform = ({ data }) => {
             <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 2, background: s.status === "active" ? "rgba(133,135,85,0.12)" : "rgba(238,92,95,0.1)", color: s.status === "active" ? C.olive : C.coral }}>{s.status}</span>
           </div>)}
       </div>}
+
       {catalogueTab === "esg" && <div>
         <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 110px 80px", gap: 12, padding: "8px 12px", background: C.off, fontSize: 10, fontWeight: 700, color: C.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>
           <span>Code</span><span>Name</span><span>Type</span><span>Status</span>
@@ -1124,22 +1220,27 @@ const Platform = ({ data }) => {
           })}
       </div>}
     </div>
+
     {exportedAt && <div style={{ marginTop: 10, fontSize: 11, color: C.dim, textAlign: "right" }}>Last exported from platform: {new Date(exportedAt).toLocaleString()}</div>}
   </div>;
 };
+
 // ─── DISCREPANCIES TAB ───────────────────────────────────────────────────────
 const Discrepancies = ({ discrepancies, allData, platformData }) => {
   const [dbFilter, setDbFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [verticalFilter, setVerticalFilter] = useState('ALL');
+
   if (!platformData) return (
     <div style={{ textAlign: "center", padding: 60, color: C.dim, fontStyle: "italic" }}>
       Backend not connected — set BACKEND_API_URL and KNOWLEDGEBASE_API_KEY to enable discrepancy detection.
     </div>
   );
+
   const inScope  = r => Array.isArray(r.vertical) && r.vertical.some(v => IN_SCOPE_VERTICALS.includes(v));
   const inScopeQ = r => true; // Questions rollup unfixed → keep all in scope; change to the inScope form once fixed
   const { themes, subthemes, indicators, questions } = discrepancies;
+
   // Totals: structured items scoped to in-scope verticals; questions kept broad until the rollup field is fixed
   const totals = {
     Themes:       allData.filter(r => r.db === 'Themes'     && inScope(r)).length,
@@ -1147,25 +1248,31 @@ const Discrepancies = ({ discrepancies, allData, platformData }) => {
     Indicators:   allData.filter(r => r.db === 'Indicators' && inScope(r)).length,
     Questions:    allData.filter(r => r.db === 'Questions'  && inScopeQ(r)).length,
   };
+
   const allRows = [
     ...themes.map(r => ({ ...r, _db: 'Themes' })),
     ...subthemes.map(r => ({ ...r, _db: 'Sub-themes' })),
     ...indicators.map(r => ({ ...r, _db: 'Indicators' })),
     ...(questions || []).map(r => ({ ...r, _db: 'Questions' })),
   ];
+
   const notionStatuses = [...new Set(allRows.map(r => r.status).filter(Boolean))].sort();
+
   const rows = allRows
     .filter(r => dbFilter === 'ALL' || r._db === dbFilter)
     .filter(r => statusFilter === 'ALL' || r.status === statusFilter)
     .filter(r => verticalFilter === 'ALL' || (Array.isArray(r.vertical) && r.vertical.includes(verticalFilter)));
+
   const totalMissing = themes.length + subthemes.length + indicators.length + (questions || []).length;
   const filterBtn = (label, val, current, setter, count) => (
     <button key={val} onClick={() => setter(val)} style={{ padding: "5px 12px", borderRadius: 4, fontSize: 11, fontWeight: 700, fontFamily: "inherit", border: `1px solid ${current === val ? C.coral : C.cloud}`, background: current === val ? C.coral + "18" : "transparent", color: current === val ? C.coral : C.muted, cursor: "pointer" }}>
       {label}{count !== undefined ? ` (${count})` : ''}
     </button>
   );
+
   const dbColors = { Themes: C.amber, 'Sub-themes': C.plum, Indicators: C.olive, Questions: C.sky || '#4ea8de' };
   const vCount = v => allRows.filter(r => Array.isArray(r.vertical) && r.vertical.includes(v)).length;
+
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 16, marginBottom: 24 }}>
@@ -1175,6 +1282,7 @@ const Discrepancies = ({ discrepancies, allData, platformData }) => {
         <KPI val={indicators.length} label="Indicators" accent={C.olive} />
         <KPI val={(questions || []).length} label="Questions" accent={C.sky || '#4ea8de'} />
       </div>
+
       {['Themes', 'Sub-themes', 'Indicators', 'Questions'].map(db => {
         const total = totals[db] || 0;
         const missing = (discrepancies[db === 'Themes' ? 'themes' : db === 'Sub-themes' ? 'subthemes' : db === 'Indicators' ? 'indicators' : 'questions'] || []).length;
@@ -1193,6 +1301,7 @@ const Discrepancies = ({ discrepancies, allData, platformData }) => {
           </div>
         );
       })}
+
       <div style={{ background: "rgba(133,135,85,0.07)", border: `1px solid ${C.cloud}`, borderRadius: 6, padding: "10px 14px", marginTop: 20, marginBottom: 4, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.olive, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: 4 }}>Vertical</span>
         {filterBtn('All', 'ALL', verticalFilter, setVerticalFilter)}
@@ -1201,6 +1310,7 @@ const Discrepancies = ({ discrepancies, allData, platformData }) => {
         {filterBtn('C4C', 'C4C', verticalFilter, setVerticalFilter, vCount('C4C'))}
         <span style={{ fontSize: 10, color: C.dim, fontStyle: "italic", marginLeft: 8 }}>Gap counts above include all in-scope verticals</span>
       </div>
+
       <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase", marginRight: 4 }}>DB</span>
         {filterBtn('All', 'ALL', dbFilter, setDbFilter)}
@@ -1212,6 +1322,7 @@ const Discrepancies = ({ discrepancies, allData, platformData }) => {
         {filterBtn('All', 'ALL', statusFilter, setStatusFilter)}
         {notionStatuses.map(s => filterBtn(s, s, statusFilter, setStatusFilter))}
       </div>
+
       {rows.length === 0
         ? <div style={{ textAlign: "center", padding: 40, color: C.olive, fontStyle: "italic", fontWeight: 600 }}>✓ All {dbFilter === 'ALL' ? '' : dbFilter + ' '}items transferred to backend</div>
         : <div style={{ background: C.white, borderRadius: 8, border: `1px solid ${C.cloud}`, overflow: "hidden" }}>
@@ -1237,6 +1348,7 @@ const Discrepancies = ({ discrepancies, allData, platformData }) => {
     </div>
   );
 };
+
 // ─── STANDARDS REVIEW TAB ───────────────────────────────────────────────────
 const StandardsReview = ({ standards }) => {
   const [view, setView] = useState('calendar');
@@ -1244,25 +1356,30 @@ const StandardsReview = ({ standards }) => {
   const [reviewerFilter, setReviewerFilter] = useState('ALL');
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
+
   const reviewWindows = standards.filter(r => r.startDate || r.dueReview);
   const reviewerOptions = [...new Set(standards.map(r => r.reviewer).filter(Boolean))].sort();
   const statusOptions = [...new Set(standards.map(r => r.status).filter(Boolean))].sort();
   const scheduledCount = reviewWindows.length;
   const completedCount = standards.filter(r => r.completionDate).length;
   const reviewedCount = standards.filter(r => r.reviewer).length;
+
   const filteredRows = standards
     .filter(r => statusFilter === 'ALL' || r.status === statusFilter)
     .filter(r => reviewerFilter === 'ALL' || r.reviewer === reviewerFilter)
     .sort((a, b) => (a.dueReview || '9999-12-31').localeCompare(b.dueReview || '9999-12-31') || (a.name || '').localeCompare(b.name || ''));
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
   const rows = filteredRows.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
   useEffect(() => { setPage(0); }, [statusFilter, reviewerFilter]);
   useEffect(() => { if (page >= totalPages) setPage(totalPages - 1); }, [page, totalPages]);
+
   const [month, setMonth] = useState(() => {
     const firstReview = reviewWindows.map(r => r.startDate || r.dueReview).sort()[0];
     const base = firstReview ? new Date(`${firstReview}T12:00:00`) : new Date();
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
+
   // A review can have both Start Date and Due Review. Build week-by-week
   // segments so each review is rendered as a horizontal bar across its range,
   // including ranges that cross a calendar-week boundary.
@@ -1279,6 +1396,7 @@ const StandardsReview = ({ standards }) => {
     const weeks = Array.from({ length: cellCount / 7 }, (_, index) => ({ days: days.slice(index * 7, index * 7 + 7), segments: [] }));
     const calendarStartIso = days[0].iso;
     const calendarEndIso = days[days.length - 1].iso;
+
     standards.filter(record => record.startDate || record.dueReview).forEach(record => {
       let start = record.startDate || record.dueReview;
       let end = record.dueReview || record.startDate;
@@ -1286,6 +1404,7 @@ const StandardsReview = ({ standards }) => {
       start = start < calendarStartIso ? calendarStartIso : start;
       end = end > calendarEndIso ? calendarEndIso : end;
       if (start > end) return;
+
       weeks.forEach((week, weekIndex) => {
         const weekStart = week.days[0].iso;
         const weekEnd = week.days[6].iso;
@@ -1300,6 +1419,7 @@ const StandardsReview = ({ standards }) => {
         });
       });
     });
+
     weeks.forEach(week => {
       const laneEnds = [];
       week.segments.sort((a, b) => a.start - b.start || b.end - a.end).forEach(segment => {
@@ -1310,6 +1430,7 @@ const StandardsReview = ({ standards }) => {
       });
       week.lanes = laneEnds.length;
     });
+
     return { weeks };
   }, [month, standards]);
   const statusStyle = status => status === 'Complete' || status === 'Completed'
@@ -1317,6 +1438,7 @@ const StandardsReview = ({ standards }) => {
     : status === 'Not started'
       ? { bg: 'rgba(205,128,40,0.12)', color: '#8a4e10' }
       : { bg: 'rgba(81,20,51,0.10)', color: C.plum };
+
   if (standards.length === 0) return (
     <Card title="Standards review">
       <div style={{ padding: '22px 0', color: C.dim, fontSize: 13 }}>
@@ -1324,6 +1446,7 @@ const StandardsReview = ({ standards }) => {
       </div>
     </Card>
   );
+
   return <div>
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginBottom: 16 }}>
       <KPI val={standards.length} label="Standards" accent={C.forest} />
@@ -1331,11 +1454,13 @@ const StandardsReview = ({ standards }) => {
       <KPI val={scheduledCount} label="Review windows set" accent={C.amber} />
       <KPI val={completedCount} label="Completed" accent={C.olive} />
     </div>
+
     <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
       {[['Calendar', 'calendar'], ['Standards register', 'register']].map(([label, value]) => (
         <button key={value} onClick={() => setView(value)} style={{ padding: '6px 12px', borderRadius: 4, border: `1px solid ${view === value ? C.forest : C.cloud}`, background: view === value ? C.forest : C.white, color: view === value ? C.white : C.muted, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{label}</button>
       ))}
     </div>
+
     {view === 'calendar' && (
       <Card title="Review calendar" sub="Dates use the Due Review property in Notion">
         {reviewWindows.length === 0 ? (
@@ -1366,6 +1491,7 @@ const StandardsReview = ({ standards }) => {
         </>}
       </Card>
     )}
+
     {view === 'register' && <Card title="Standards register" sub={`${filteredRows.length} matching records`}>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <label style={{ fontSize: 11, color: C.dim, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Status&nbsp;
@@ -1410,6 +1536,7 @@ const StandardsReview = ({ standards }) => {
     </Card>}
   </div>;
 };
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [tab, setTab] = useState("overview");
@@ -1424,6 +1551,7 @@ function App() {
   const [dbCounts, setDbCounts] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
+
   const fetchData = () => {
     setSyncing(true);
     fetch("/.netlify/functions/notion-data", { cache: "no-store" })
@@ -1449,17 +1577,20 @@ function App() {
           : `Live data unavailable · ${error.message}`);
       })
       .finally(() => setSyncing(false));
+
     fetch("/.netlify/functions/backend-data", { cache: "no-store" })
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => setPlatformData(data))
       .catch(() => setPlatformData(null));
   };
+
   useEffect(() => { fetchData(); }, []);
   // Standards are deliberately separate from the KB quality workflow. They
   // have their own review calendar and register rather than changing KB counts.
   const kbData = useMemo(() => allData.filter(r => r.db !== 'Standards'), [allData]);
   const standardsData = useMemo(() => allData.filter(r => r.db === 'Standards'), [allData]);
   const discrepancies = useMemo(() => computeDiscrepancies(kbData, platformData), [kbData, platformData]);
+
   // Derive owner options: always include NAMED_OWNERS as a baseline,
   // plus anyone else found in live data (e.g. new people added in Notion)
   const ownerOptions = useMemo(() => {
@@ -1467,6 +1598,7 @@ function App() {
     const merged = [...new Set([...NAMED_OWNERS, ...fromData])].sort();
     return ['ALL', ...merged];
   }, [kbData]);
+
   const assignedByOptions = useMemo(() => {
     const fromData = kbData.map(r => r.assignedBy).filter(Boolean);
     // Keep the dropdown grounded in the live data: a person appears only when
@@ -1474,25 +1606,31 @@ function App() {
     const merged = [...new Set(fromData)].sort();
     return ['ALL', ...merged];
   }, [kbData]);
+
   // Reset oFilter if the current value is no longer in the live data options
   React.useEffect(() => {
     if (oFilter !== 'ALL' && !ownerOptions.includes(oFilter)) setOFilter('ALL');
   }, [ownerOptions]);
+
   React.useEffect(() => {
     if (assignedByFilter !== 'ALL' && !assignedByOptions.includes(assignedByFilter)) setAssignedByFilter('ALL');
   }, [assignedByOptions]);
+
   const filtered = kbData.filter(r =>
     (vFilter === "ALL" || (Array.isArray(r.vertical) && r.vertical.includes(vFilter))) &&
     (oFilter === "ALL" || r.actionNeededBy.includes(oFilter)) &&
     (assignedByFilter === "ALL" || r.assignedBy === assignedByFilter) &&
     (workMode === "ALL" || r.db === workMode)
   );
+
   const TABS = ["overview", "standards", "today", "pipeline", "quality", "hierarchy", "search", "velocity", "platform", "discrepancies"];
   const TAB_LABELS = { overview: "Overview", standards: "Standards Review", today: "Today's Batches", pipeline: "Pipeline", quality: "Quality", hierarchy: "Hierarchy", search: "KB Search", velocity: "Velocity", platform: "Platform Models", discrepancies: "⚠ Sync Gaps" };
   const MODES = ["ALL", "Themes", "Sub-themes", "Indicators", "Questions"];
+
   const headerBtn = (label, onClick, active) => (
     <button onClick={onClick} style={{ padding: "4px 12px", borderRadius: 3, fontSize: 11, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", background: active ? C.amber : "transparent", color: active ? C.white : "rgba(255,255,255,0.4)", cursor: "pointer", transition: "all 0.12s" }}>{label}</button>
   );
+
   return (
     <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", background: C.off, minHeight: "100vh" }}>
       {/* HEADER */}
@@ -1542,6 +1680,7 @@ function App() {
           </div>
         </div>
       </div>
+
       {/* MODE BAR */}
       <div style={{ background: C.plum, padding: "0 32px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", flexWrap: "wrap" }}>
         <div style={{ display: "flex" }}>
@@ -1556,6 +1695,7 @@ function App() {
           {MODES.map(m => headerBtn(m === "ALL" ? "All" : m, () => setWorkModeState(m), workMode === m))}
         </div>
       </div>
+
       {/* WORK MODE BANNER */}
       {workMode !== "ALL" && (
         <div style={{ background: C.amber, padding: "10px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1566,6 +1706,7 @@ function App() {
           <button onClick={() => setWorkModeState("ALL")} style={{ background: "rgba(255,255,255,0.15)", border: "none", color: C.white, padding: "6px 14px", borderRadius: 3, fontFamily: "inherit", fontSize: 12, fontWeight: 700, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase" }}>EXIT</button>
         </div>
       )}
+
       {/* CONTENT */}
       <div style={{ padding: "24px 32px", maxWidth: 1500, margin: "0 auto" }}>
         {tab === "overview" && <Overview filtered={filtered} discrepancies={discrepancies} allData={kbData} />}
@@ -1579,6 +1720,7 @@ function App() {
         {tab === "platform" && <Platform data={platformData} />}
         {tab === "discrepancies" && <Discrepancies discrepancies={discrepancies} allData={kbData} platformData={platformData} />}
       </div>
+
       {/* FOOTER */}
       <div style={{ padding: "12px 32px", fontSize: 11, color: "rgba(255,255,255,0.3)", background: C.forest, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span><strong style={{ color: "rgba(255,255,255,0.55)" }}>CONNECT GO</strong> · Knowledge Base Quality Dashboard · v2.1</span>
@@ -1587,6 +1729,7 @@ function App() {
     </div>
   );
 }
+
 const domRoot = ReactDOM.createRoot(document.getElementById('root'));
 domRoot.render(React.createElement(App));
 </script>
