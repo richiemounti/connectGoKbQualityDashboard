@@ -1,11 +1,4 @@
 /**
- * gate.js — the sign-in wall.
- *
- * Runs on Netlify's edge in front of every request, before any file is
- * served. No valid session, no dashboard.
- *
- * Runs on Deno, so it uses Web Crypto. It only verifies the session token —
- * passwords and MongoDB live in netlify/functions/auth.js.
  */
 
 const COOKIE = '__Host-cg_session';
