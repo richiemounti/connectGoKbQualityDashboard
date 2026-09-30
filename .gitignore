@@ -11,3 +11,6 @@
 
 # Node (if you ever add dependencies)
 node_modules/
+
+# Staff list for bulk-create-users (personal data)
+scripts/users.json

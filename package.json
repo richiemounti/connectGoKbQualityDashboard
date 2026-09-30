@@ -1,6 +1,10 @@
 {
   "name": "connectgo-knowledge-base-dashboard",
   "private": true,
+  "scripts": {
+    "create-user": "node --env-file=.env scripts/create-user.js",
+    "bulk-create-users": "node --env-file=.env scripts/bulk-create-users.js"
+  },
   "dependencies": {
     "mongodb": "^6.16.0"
   }
