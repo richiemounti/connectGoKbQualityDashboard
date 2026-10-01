@@ -1677,6 +1677,9 @@ function App() {
             <button onClick={fetchData} disabled={syncing} style={{ padding: "3px 9px", borderRadius: 3, fontSize: 10, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", background: "transparent", color: syncing ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.45)", cursor: syncing ? "not-allowed" : "pointer" }}>
               {syncing ? "Syncing…" : "↻ Sync"}
             </button>
+            <a href="/account.html" style={{ padding: "3px 9px", borderRadius: 3, fontSize: 10, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.45)", textDecoration: "none" }}>
+              My account
+            </a>
             <a href="/.netlify/functions/auth?action=logout" style={{ padding: "3px 9px", borderRadius: 3, fontSize: 10, fontWeight: 700, fontFamily: "inherit", letterSpacing: "0.08em", textTransform: "uppercase", border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.45)", textDecoration: "none" }}>
               Sign out
             </a>

@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Manage users &middot; ConnectGo</title>
+<style>
+  :root {
+    --green: #1C332C;
+    --gold: #C2A14D;
+    --bg: #F2F1EC;
+    --border: #C7CFC9;
+    --line: #E4E7E3;
+    --muted: #5F6B64;
+    --danger: #A6312B;
+    --ok: #2E6B4F;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--green);
+    font: 15px/1.5 'Space Grotesk', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    padding: 18px 32px; background: var(--green); color: #fff;
+  }
+  .wordmark { margin: 0; font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; }
+  .wordmark em { font-style: normal; color: var(--gold); }
+  .wordmark span { margin-left: 12px; font-size: .75rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .55; }
+  header nav { display: flex; gap: 8px; }
+  header nav a {
+    padding: 5px 12px; border: 1px solid rgba(255,255,255,.25); border-radius: 4px;
+    color: rgba(255,255,255,.75); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
+  }
+  header nav a:hover { color: #fff; border-color: rgba(255,255,255,.5); }
+  main { max-width: 1180px; margin: 0 auto; padding: 32px; }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; letter-spacing: -.02em; }
+  .sub { margin: 0 0 24px; color: var(--muted); }
+  .card { background: #fff; border-radius: 14px; padding: 22px 24px; margin-bottom: 24px; box-shadow: 0 1px 2px rgba(28,51,44,.04), 0 12px 32px -16px rgba(28,51,44,.14); }
+  .card h2 { margin: 0 0 14px; font-size: 1.05rem; }
+  label.field { display: block; font-size: .8rem; font-weight: 700; margin-bottom: 4px; }
+  input[type=text], input[type=email] {
+    width: 100%; padding: .6rem .75rem; font: inherit; color: var(--green);
+    border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  }
+  input:focus-visible, button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(28,51,44,.18); border-color: var(--green); }
+  .add-grid { display: grid; grid-template-columns: 1fr 1.3fr auto auto; gap: 14px; align-items: end; }
+  .checks { display: flex; gap: 14px; flex-wrap: wrap; padding-bottom: 8px; }
+  .checks label { display: inline-flex; align-items: center; gap: 6px; font-size: .88rem; cursor: pointer; }
+  input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--green); cursor: pointer; }
+  button {
+    font: inherit; font-weight: 700; cursor: pointer; border-radius: 8px;
+    padding: .6rem 1.1rem; border: 0; background: var(--green); color: #fff;
+  }
+  button:hover:not(:disabled) { background: #152722; }
+  button:disabled { opacity: .55; cursor: progress; }
+  button.ghost { background: transparent; color: var(--green); border: 1px solid var(--border); padding: .3rem .65rem; font-size: .78rem; }
+  button.ghost:hover:not(:disabled) { background: rgba(28,51,44,.05); }
+  button.danger { color: var(--danger); border-color: rgba(166,49,43,.35); }
+  button.danger:hover:not(:disabled) { background: rgba(166,49,43,.06); }
+  .table-wrap { overflow-x: auto; margin: 0 -24px; padding: 0 24px; }
+  table { width: 100%; border-collapse: collapse; min-width: 860px; }
+  th { text-align: left; font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th.c, td.c { text-align: center; }
+  td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; font-size: .9rem; }
+  tr.inactive td:not(.actions) { opacity: .5; }
+  .who strong { display: block; }
+  .who small { color: var(--muted); }
+  .you { margin-left: 6px; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: .72rem; font-weight: 700; }
+  .badge.active { background: rgba(46,107,79,.1); color: var(--ok); }
+  .badge.off { background: rgba(95,107,100,.12); color: var(--muted); }
+  .badge.locked { background: rgba(166,49,43,.1); color: var(--danger); }
+  .actions { white-space: nowrap; text-align: right; }
+  .actions button + button { margin-left: 6px; }
+  .muted { color: var(--muted); }
+  .note { margin: 14px 0 0; color: var(--muted); font-size: .82rem; }
+  .msg { margin: 0 0 16px; padding: .65rem .85rem; border: 1px solid; border-radius: 8px; font-size: .9rem; }
+  .msg.error { color: var(--danger); border-color: rgba(166,49,43,.3); background: rgba(166,49,43,.06); }
+  .msg.info { color: var(--ok); border-color: rgba(46,107,79,.3); background: rgba(46,107,79,.06); }
+  dialog { border: 0; border-radius: 14px; padding: 26px 28px; max-width: 30rem; width: calc(100% - 32px); color: var(--green); box-shadow: 0 24px 64px -16px rgba(28,51,44,.35); }
+  dialog::backdrop { background: rgba(28,51,44,.35); }
+  dialog h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  dialog p { margin: 0 0 14px; color: var(--muted); }
+  .secret { display: flex; gap: 8px; margin-bottom: 18px; }
+  .secret code { flex: 1; padding: .6rem .75rem; background: var(--bg); border-radius: 8px; font: 600 1rem ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+  [hidden] { display: none !important; }
+  @media (max-width: 760px) {
+    header, main { padding-left: 16px; padding-right: 16px; }
+    .add-grid { grid-template-columns: 1fr; }
+    .table-wrap { margin: 0 -24px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <p class="wordmark">CONNECT<em>GO</em><span>User access</span></p>
+  <nav>
+    <a href="/">Dashboard</a>
+    <a href="/account.html">My account</a>
+    <a href="/.netlify/functions/auth?action=logout">Sign out</a>
+  </nav>
+</header>
+
+<main>
+  <h1>Manage users</h1>
+  <p class="sub">One account per person, shared across every ConnectGo dashboard. Tick the dashboards each person can open.</p>
+
+  <div id="message" class="msg" hidden></div>
+
+  <section class="card" id="add-card" hidden>
+    <h2>Add a user</h2>
+    <form id="add-form" class="add-grid">
+      <div>
+        <label class="field" for="add-name">Name</label>
+        <input id="add-name" type="text" autocomplete="off">
+      </div>
+      <div>
+        <label class="field" for="add-email">Email</label>
+        <input id="add-email" type="email" required autocomplete="off">
+      </div>
+      <div class="checks" id="add-checks"></div>
+      <button type="submit" id="add-submit">Add user</button>
+    </form>
+    <p class="note">They get a temporary password, shown once. They can change it under My account after signing in.</p>
+  </section>
+
+  <section class="card">
+    <h2>People</h2>
+    <div class="table-wrap">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"><tr><td class="muted">Loading…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="note">Admins can open every dashboard and manage users. Changes apply on each person's next page load or data refresh.</p>
+  </section>
+</main>
+
+<dialog id="pw-dialog">
+  <h2>Temporary password</h2>
+  <p>For <strong id="pw-email"></strong>. This is the only time it's shown, so send it to them privately now.</p>
+  <div class="secret">
+    <code id="pw-value"></code>
+    <button type="button" class="ghost" id="pw-copy">Copy</button>
+  </div>
+  <form method="dialog"><button type="submit">Done</button></form>
+</dialog>
+
+<script>
+(function () {
+  'use strict';
+  var API = '/.netlify/functions/admin';
+  var LABELS = { kb: 'KB', ops: 'Ops', governance: 'Governance', admin: 'Admin' };
+  var state = { me: null, dashboards: [], users: [] };
+  var msg = document.getElementById('message');
+
+  function el(tag, props, children) {
+    var node = document.createElement(tag);
+    Object.keys(props || {}).forEach(function (k) {
+      if (k === 'text') node.textContent = props[k];
+      else if (k === 'className') node.className = props[k];
+      else if (k.slice(0, 2) === 'on') node.addEventListener(k.slice(2), props[k]);
+      else node.setAttribute(k, props[k]);
+    });
+    (children || []).forEach(function (c) { if (c) node.appendChild(c); });
+    return node;
+  }
+
+  function show(text, kind) {
+    msg.textContent = text;
+    msg.className = 'msg ' + (kind || 'info');
+    msg.hidden = false;
+    clearTimeout(show.t);
+    if (kind !== 'error') show.t = setTimeout(function () { msg.hidden = true; }, 4000);
+  }
+
+  function call(action, body) {
+    var opts = body
+      ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+      : { method: 'GET' };
+    opts.cache = 'no-store';
+    return fetch(API + '?action=' + action, opts).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (res.status === 401) throw new Error('Admins only. Your account does not have admin access.');
+        if (!res.ok) throw new Error(data.error || 'Request failed (' + res.status + ')');
+        return data;
+      });
+    });
+  }
+
+  function when(date) {
+    if (!date) return 'Never';
+    var d = new Date(date);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
+      d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function showPassword(email, password) {
+    document.getElementById('pw-email').textContent = email;
+    document.getElementById('pw-value').textContent = password;
+    document.getElementById('pw-copy').textContent = 'Copy';
+    document.getElementById('pw-dialog').showModal();
+  }
+
+  document.getElementById('pw-copy').addEventListener('click', function () {
+    var btn = this;
+    navigator.clipboard.writeText(document.getElementById('pw-value').textContent)
+      .then(function () { btn.textContent = 'Copied'; })
+      .catch(function () { btn.textContent = 'Select & copy'; });
+  });
+
+  function rolesOf(row) {
+    var dashboards = state.dashboards.filter(function (d) {
+      var box = row.querySelector('input[data-role="' + d + '"]');
+      return box && box.checked;
+    });
+    return { dashboards: dashboards, admin: row.querySelector('input[data-role="admin"]').checked };
+  }
+
+  function save(user, changes, row) {
+    row.querySelectorAll('input, button').forEach(function (n) { n.disabled = true; });
+    var body = Object.assign({ email: user.email }, changes);
+    return call('update', body)
+      .then(function (data) {
+        Object.assign(user, data.user);
+        show('Saved ' + (user.name || user.email) + '.');
+      })
+      .catch(function (err) { show(err.message, 'error'); })
+      .then(render);
+  }
+
+  function action(name, user, confirmText) {
+    if (confirmText && !confirm(confirmText)) return;
+    call(name, { email: user.email })
+      .then(function (data) {
+        if (data.password) showPassword(data.email, data.password);
+        else show(name === 'delete' ? 'Deleted ' + user.email + '.' : 'Unlocked ' + user.email + '.');
+        return load();
+      })
+      .catch(function (err) { show(err.message, 'error'); });
+  }
+
+  function renderHead() {
+    var cells = [el('th', { text: 'Person' })];
+    state.dashboards.concat('admin').forEach(function (d) { cells.push(el('th', { className: 'c', text: LABELS[d] || d })); });
+    cells.push(el('th', { text: 'Status' }), el('th', { text: 'Last sign-in' }), el('th', { className: 'actions', text: '' }));
+    var thead = document.getElementById('thead');
+    thead.textContent = '';
+    thead.appendChild(el('tr', {}, cells));
+  }
+
+  function renderRow(user) {
+    var isMe = user.email === state.me;
+    var row = el('tr', { className: user.active ? '' : 'inactive' });
+    row.appendChild(el('td', { className: 'who' }, [
+      el('strong', { text: user.name || '—' }, [isMe ? el('span', { className: 'you', text: 'You' }) : null]),
+      el('small', { text: user.email }),
+    ]));
+    state.dashboards.concat('admin').forEach(function (role) {
+      var box = el('input', { type: 'checkbox', 'data-role': role, 'aria-label': (LABELS[role] || role) + ' for ' + user.email });
+      box.checked = user.roles.indexOf(role) !== -1;
+      if (role === 'admin' && isMe) { box.disabled = true; box.title = "You can't remove your own admin access"; }
+      box.addEventListener('change', function () { save(user, rolesOf(row), row); });
+      row.appendChild(el('td', { className: 'c' }, [box]));
+    });
+    var status = !user.active ? el('span', { className: 'badge off', text: 'Deactivated' })
+      : user.locked ? el('span', { className: 'badge locked', text: 'Locked out' })
+      : el('span', { className: 'badge active', text: 'Active' });
+    row.appendChild(el('td', {}, [status]));
+    row.appendChild(el('td', { className: 'muted', text: when(user.last_login_at) }));
+
+    var buttons = [];
+    if (user.locked) buttons.push(el('button', { type: 'button', className: 'ghost', text: 'Unlock', onclick: function () { action('unlock', user); } }));
+    buttons.push(el('button', { type: 'button', className: 'ghost', text: 'Reset password', onclick: function () {
+      action('reset', user, 'Reset the password for ' + user.email + '? Their current password will stop working.');
+    } }));
+    if (!isMe) {
+      buttons.push(el('button', { type: 'button', className: 'ghost', text: user.active ? 'Deactivate' : 'Reactivate', onclick: function () {
+        save(user, { active: !user.active }, row);
+      } }));
+      buttons.push(el('button', { type: 'button', className: 'ghost danger', text: 'Delete', onclick: function () {
+        action('delete', user, 'Permanently delete ' + user.email + '? Deactivate instead if they might come back.');
+      } }));
+    }
+    row.appendChild(el('td', { className: 'actions' }, buttons));
+    return row;
+  }
+
+  function render() {
+    var tbody = document.getElementById('tbody');
+    tbody.textContent = '';
+    if (!state.users.length) {
+      tbody.appendChild(el('tr', {}, [el('td', { className: 'muted', text: 'No users yet.' })]));
+      return;
+    }
+    state.users.forEach(function (u) { tbody.appendChild(renderRow(u)); });
+  }
+
+  function renderAddChecks() {
+    var wrap = document.getElementById('add-checks');
+    wrap.textContent = '';
+    state.dashboards.concat('admin').forEach(function (role) {
+      var box = el('input', { type: 'checkbox', 'data-role': role });
+      box.checked = role !== 'admin';
+      wrap.appendChild(el('label', {}, [box, document.createTextNode(LABELS[role] || role)]));
+    });
+  }
+
+  function load() {
+    return call('list').then(function (data) {
+      var first = !state.me;
+      state.me = data.me;
+      state.dashboards = data.dashboards;
+      state.users = data.users;
+      if (first) { renderHead(); renderAddChecks(); document.getElementById('add-card').hidden = false; }
+      render();
+    }).catch(function (err) {
+      document.getElementById('tbody').textContent = '';
+      show(err.message, 'error');
+    });
+  }
+
+  document.getElementById('add-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = document.getElementById('add-submit');
+    var checks = document.getElementById('add-checks');
+    var body = {
+      name: document.getElementById('add-name').value,
+      email: document.getElementById('add-email').value,
+      dashboards: state.dashboards.filter(function (d) { return checks.querySelector('input[data-role="' + d + '"]').checked; }),
+      admin: checks.querySelector('input[data-role="admin"]').checked,
+    };
+    btn.disabled = true;
+    call('create', body)
+      .then(function (data) {
+        e.target.reset();
+        renderAddChecks();
+        showPassword(data.email, data.password);
+        return load();
+      })
+      .catch(function (err) { show(err.message, 'error'); })
+      .then(function () { btn.disabled = false; });
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

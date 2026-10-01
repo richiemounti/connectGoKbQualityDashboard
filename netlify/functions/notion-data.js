@@ -383,7 +383,7 @@ exports.handler = async function (event) {
   }
 
   // Second line of defence behind the edge gate: no valid session, no data.
-  if (!requireUser(event)) return unauthorized();
+  if (!(await requireUser(event))) return unauthorized();
 
   const token = process.env.NOTION_TOKEN;
   if (!token) {

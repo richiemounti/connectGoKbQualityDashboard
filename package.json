@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "create-user": "node --env-file=.env scripts/create-user.js",
-    "bulk-create-users": "node --env-file=.env scripts/bulk-create-users.js"
+    "bulk-create-users": "node --env-file=.env scripts/bulk-create-users.js",
+    "copy-users": "node --env-file=.env scripts/copy-users.js"
   },
   "dependencies": {
     "mongodb": "^6.16.0"

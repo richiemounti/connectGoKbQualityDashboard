@@ -22,7 +22,7 @@ exports.handler = async function (event) {
   }
 
   // Second line of defence behind the edge gate: no valid session, no data.
-  if (!requireUser(event)) return unauthorized();
+  if (!(await requireUser(event))) return unauthorized();
 
   const apiUrl = process.env.BACKEND_API_URL;
   const apiKey = process.env.KNOWLEDGEBASE_API_KEY;
